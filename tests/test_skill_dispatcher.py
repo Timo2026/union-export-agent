@@ -253,8 +253,11 @@ def test_dispatch_blocks_path_outside_sandbox():
     assert "render_thumbnail" not in resp["executed_skills"] or resp["openshell_violations"]
 
 
-def test_dispatch_golden_chain_accepts_string_customer():
+def test_dispatch_golden_chain_accepts_string_customer(require_engine):
     """推理执行台把 customer 当自由文本传 ("Northwind"), 不得崩黄金链。
+
+    引擎依赖: golden_chain 离线分支要跑真内核子进程 (_kernel_bridge);
+    公开克隆/CI 不携带 _timo_engine → 按项目约定 skip (见 conftest.require_engine)。
 
     回归: 2026-09-25 公网 :8051 实测 POST /v1/agent/task → golden_chain
     AttributeError("'str' object has no attribute 'get'") (CATController.run
@@ -280,8 +283,10 @@ def test_dispatch_golden_chain_accepts_string_customer():
         f"golden_chain 未执行: trace={entry}")
 
 
-def test_dispatch_openshell_violations_are_per_dispatch():
+def test_dispatch_openshell_violations_are_per_dispatch(require_engine):
     """同一 dispatcher 连跑两轮: openshell_violations 只含本轮, 不得累积历史。
+
+    引擎依赖: 两轮 golden_chain 均需真内核子进程 (见 conftest.require_engine)。
 
     契约演进 (2026-09-26 N1 巡检): 审计演示 (iron_rule_override_blocked,
     模拟 LLM 改写被锁拦) 不再进 openshell_violations — 健康轮次 0 条;
@@ -494,8 +499,10 @@ def test_route_use_llm_absent_or_true_keeps_llm_first(monkeypatch):
 
 # ---- N1: 审计演示违规不得冒充"OpenShell 违规" (狼来了) ----
 
-def test_dispatch_override_demo_not_in_openshell_violations():
-    """iron_rule_override_blocked 是设计内的"模拟 LLM 篡改已被锁拦截"审计演示;
+def test_dispatch_override_demo_not_in_openshell_violations(require_engine):
+    """引擎依赖: 同上, golden_chain 需真内核子进程 (见 conftest.require_engine)。
+
+    iron_rule_override_blocked 是设计内的"模拟 LLM 篡改已被锁拦截"审计演示;
     其 violation 不得再进 openshell_violations — 否则每轮响应都吐红字
     "OpenShell 违规: 确定性输出被改写" (2026-09-25 公网实测, 每次任务必现),
     真违规会被淹没 (狼来了)。演示结果只归 iron_rule_override_blocked。

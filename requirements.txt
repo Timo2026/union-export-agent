@@ -12,9 +12,17 @@ python-multipart>=0.0.6
 pypdf>=3.0
 openpyxl>=3.1
 
+# RAG 检索点云投影 (services/search_reid.py); 缺库则端点返回 degraded
+numpy>=1.24
+
+# 可选: Gmail IMAP 拉信 (services/gmail_imap.py, Apache-2.0); 默认禁,
+# 显式 enabled 才启动 (缺库则 puller.is_enabled() 报凭证/依赖不足, 不静默启动)
+imap_tools>=1.5
+
 # 可选: 报价单 PDF 附件渲染 (services/quote_pdf.py; 缺库则草稿显式标注
 # attachment_error=reportlab_not_installed, 仍 draft_only, 不影响其它能力)
 reportlab>=4.0
 
 # 测试
 pytest>=7.0
+httpx>=0.27          # starlette TestClient 依赖 (缺则全部 API 用例收集失败)
