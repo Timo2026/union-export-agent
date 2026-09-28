@@ -1,0 +1,69 @@
+# hpa.yaml — 弹性伸缩 (维度 6.1) + Prometheus 监控 (维度 5.3)
+# Profile C: K8s + HPA + Prometheus/Grafana + OTEL。
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: uea-api-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: union-export-agent-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 70}
+    - type: Resource
+      resource:
+        name: memory
+        target: {type: Utilization, averageUtilization: 80}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 30
+---
+# Prometheus ServiceMonitor (需 prometheus-operator CRD)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: uea-api-monitor
+  labels: {release: prometheus}
+spec:
+  selector:
+    matchLabels: {app: uea-api}
+  endpoints:
+    - port: http
+      path: /metrics        # 若启用 prometheus-fastapi-instrumentator
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: uea-api-rules
+  labels: {release: prometheus}
+spec:
+  groups:
+    - name: uea.alerts
+      rules:
+        - alert: HighHITLRate
+          expr: rate(uea_hitl_triggers_total[5m]) / rate(uea_requests_total[5m]) > 0.5
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: "HITL 触发率 > 50% (护栏/冲突/精密件偏多, 需复核策略)"
+        - alert: EngineCircuitOpen
+          expr: uea_circuit_open{backend="timo"} == 1
+          for: 2m
+          labels: {severity: critical}
+          annotations:
+            summary: "制造内核 :7862 熔断器 OPEN (已降级离线内核)"
+        - alert: QuoteLatencyHigh
+          expr: histogram_quantile(0.95, rate(uea_skill_duration_ms_bucket{skill="cnc-quote"}[5m])) > 3000
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "报价 P95 时延 > 3s"

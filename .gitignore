@@ -93,8 +93,18 @@ data/orders.json
 data/notifications.jsonl
 data/media_docs.json
 
-# 本机基建工具 (operator-side): 持实时节点 IP/凭据, 按 sanitize_public 政策不进干净 repo
-deploy/
+# 本机基建工具 (operator-side): 节点驻留脚本/一次性探针/审计产物不入干净 repo。
+# 注: deploy/ 下的 Profile A/B/C/D 部署清单 (Dockerfile / compose / k8s / hpa /
+# grafana / profiles / nim 模板) 为交付产物 (MANIFEST §89-90), 已脱敏 (仅 env
+# 注入, 无节点 IP/凭据字面量) 并由 tests/test_deploy_manifests.py 守护 → 入库。
+deploy/node_services.sh
+deploy/node_watchdog.sh
+deploy/node_bootstrap.ipynb
+deploy/*.localsheet.xlsx
+deploy/_p_*.py
+deploy/_e2e_*.py
+deploy/_s4_*.json
+deploy/livekernel.env
 scripts/sanitize_public.py
 scripts/ssh_inventory.py
 scripts/ssh_lib.py

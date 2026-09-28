@@ -1,0 +1,158 @@
+# deploy/nim/docker-compose.yml — NVIDIA NIM 微服务 (OpenAI 兼容) Nemotron 全家族编排
+#
+# ⚠️ 架构定位（2026-09-20 晚校正）：本编排是**论文架构 / 参考编排**，不是 spark-51 的实跑路径。
+#   spark-51 实测：docker daemon socket 无权限（Developer 不在 docker 组、无 root）→ 本 compose 在节点起不来。
+#   节点实跑主路径 = **vLLM/llama.cpp 进程级**（hf-mirror 下载权重，tmux 常驻），见
+#   docs/PRD-MASTER-UEA-DELIVERY.md §4.3 P2-1..P2-9 + config/models.nvidia-fullstack.yaml v3。
+#   本文件适用：评委 DGX Spark 标准环境（有 docker 权限）/ 生产集群目标。
+#
+# v3 (2026-09-20): 模型栈对齐 hf-mirror 实测仓库（仓库 ID/体积见主 PRD §1.2-F）
+#   - nim-nano-4b     :8002  FAST   NVIDIA-Nemotron-3-Nano-4B-BF16            (8.0GB)
+#   - nim-lightning   :8000  REASON NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4 (21.6GB, MoE 30B/3B激活)
+#   - nim-omni        :8020  VISION Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4 (22.4GB, any-to-any 256K)
+#   - nim-asr         :8021  ASR    nemotron-3.5-asr-streaming-0.6b           (5.7GB, 专档流式; 不再蹭 Omni)
+#   - nim-embed       :8011  EMBED  Nemotron-3-Embed-1B-BF16                  (2.3GB; nv-embedqa 已否决)
+#
+# 前置: NVIDIA GPU + driver + nvidia-container-toolkit; NGC_API_KEY (见 .env)。
+# 起:   docker compose --env-file .env up -d
+# 探活: python services/nim_smoke.py
+# 接:   config/models.nvidia-fullstack.yaml 的 endpoint 指向这里
+#
+# NIM 镜像 tag 说明:
+#   - 具体 tag 需在 NGC (nvcr.io) 查实际可用版本; below 用 latest 占位
+#   - NIM 无对应镜像时: 一律回退 vLLM 进程级加载 HF 权重 (主 PRD §4.3)
+
+version: "3.9"
+
+services:
+  # FAST: Nemotron-3-Nano-4B 边缘极速
+  nim-nano-4b:
+    image: ${NIM_NANO_4B_IMAGE:-nvcr.io/nim/nvidia/nemotron-3-nano-4b:latest}
+    container_name: uea-nim-nano-4b
+    ports: ["8002:8000"]
+    environment:
+      - NGC_API_KEY=${NGC_API_KEY}
+      - NIM_CACHE_PATH=/model-store
+      - GATEWAY_LAYER=DISABLED
+    volumes:
+      - ${MODEL_STORE:-./nim-cache}:/model-store:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/v1/models"]
+      interval: 20s
+      timeout: 5s
+      retries: 30
+
+  # REASON: Nemotron-3.5-Lightning-30B-A3B MoE 深度推理
+  # MoE: 30B 总参 / 3B 激活 -> 能力≈30B, 延迟≈4B, 单卡可跑
+  nim-lightning:
+    image: ${NIM_LIGHTNING_IMAGE:-nvcr.io/nim/nvidia/nemotron-3.5-lightning-30b-a3b:latest}
+    container_name: uea-nim-lightning
+    ports: ["8000:8000"]
+    environment:
+      - NGC_API_KEY=${NGC_API_KEY}
+      - NIM_CACHE_PATH=/model-store
+      - GATEWAY_LAYER=DISABLED
+    volumes:
+      - ${MODEL_STORE:-./nim-cache}:/model-store:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/v1/models"]
+      interval: 20s
+      timeout: 5s
+      retries: 30
+    # 进程级替代 (节点无 docker / NIM 无该镜像时):
+    #   llama-server --model nemotron-3.5-lightning-30b-a3b.Q5_K_M.gguf \
+    #     --host 0.0.0.0 --port 8000 --n-gpu-layers 99
+
+  # OMNI: Nemotron-3-Nano-Omni 多模态 (VLM+OCR 视觉线; ASR 已拆专档 nim-asr :8021)
+  nim-omni:
+    image: ${NIM_OMNI_IMAGE:-nvcr.io/nim/nvidia/nemotron-3-nano-omni:latest}
+    container_name: uea-nim-omni
+    ports: ["8020:8000"]
+    environment:
+      - NGC_API_KEY=${NGC_API_KEY}
+      - NIM_CACHE_PATH=/model-store
+      - GATEWAY_LAYER=DISABLED
+    volumes:
+      - ${MODEL_STORE:-./nim-cache}:/model-store:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/v1/models"]
+      interval: 20s
+      timeout: 5s
+      retries: 30
+
+  # ASR: nemotron-3.5-asr-streaming-0.6b 专档流式 (v3: 不再蹭 Omni; N0 回退 FunASR :8866/:8089)
+  nim-asr:
+    image: ${NIM_ASR_IMAGE:-nvcr.io/nim/nvidia/nemotron-3.5-asr-streaming-0.6b:latest}
+    container_name: uea-nim-asr
+    ports: ["8021:8000"]
+    environment:
+      - NGC_API_KEY=${NGC_API_KEY}
+      - NIM_CACHE_PATH=/model-store
+      - GATEWAY_LAYER=DISABLED
+    volumes:
+      - ${MODEL_STORE:-./nim-cache}:/model-store:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/v1/models"]
+      interval: 20s
+      timeout: 5s
+      retries: 30
+
+  # EMBED: Nemotron-3-Embed-1B-BF16 检索嵌入 (v3: nv-embedqa-e5-v5 已否决 — NIM 容器路线关闭,
+  #       进程级无官方权重证据; 换 hf-mirror 实测可下载的 Nemotron-3-Embed-1B-BF16 2.3GB)
+  nim-embed:
+    image: ${NIM_EMBED_IMAGE:-nvcr.io/nim/nvidia/nemotron-3-embed-1b-bf16:latest}
+    container_name: uea-nim-embed
+    ports: ["8011:8000"]
+    environment:
+      - NGC_API_KEY=${NGC_API_KEY}
+      - NIM_CACHE_PATH=/model-store
+    volumes:
+      - ${MODEL_STORE:-./nim-cache}:/model-store:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # 可选: NeMo Guardrails 运行时 (接 config/guardrails/nemo 的 colang)
+  # 用 backend=nemo 时启用; 缺省用内置 guardrails.py(builtin) 强制兜底。
+  # nemoguardrails:
+  #   image: ${NGR_IMAGE:-ghcr.io/nvidia-nemo-guardrails/server:latest}
+  #   ports: ["7331:7331"]
+  #   volumes: ["../../config/guardrails/nemo:/config"]
+
+  # 兼容旧服务名 (deprecated, 被 nim-nano-4b + nim-lightning 替代)
+  # nim-llm:
+  #   image: ${NIM_LLM_IMAGE:-nvcr.io/nim/meta/llama-3.1-8b-instruct:1.1.2}
+  #   container_name: uea-nim-llm
+  #   ports: ["8010:8000"]

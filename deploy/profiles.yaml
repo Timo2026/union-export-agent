@@ -1,0 +1,48 @@
+# Deployment Profiles (对齐冻结 PRD §16) — A/B/C/D
+# 每个 profile 定义后端接线与降级策略; 上层 Context/Skill/Agent API 不变。
+
+profiles:
+  A:
+    name: "Demo / Laptop"
+    desc: "零 GPU 依赖, 本地即可跑通黄金链"
+    engine: {mode: offline-vendored, note: "子进程 import 真实 calc_quote+ConflictChecker (byte-identical)"}
+    multimodal: {mode: mock, note: "ASR/RAG/VLM 显式 MOCK 标注"}
+    models: {backend: mock}
+    storage: {db: sqlite, vector: local, artifacts: filesystem}
+    observability: {tracing: otel-json, otlp: null}
+    guardrails: {backend: builtin}
+
+  B:
+    name: "DGX Spark P0"
+    desc: "单台 DGX Spark 本地 AI 节点 + 真实服务"
+    engine: {mode: http, url: "http://127.0.0.1:7862", fallback: offline-vendored}
+    multimodal: {mode: live, funasr: "http://127.0.0.1:8866", asr: "FunASR/Qwen3-ASR (P0 本地)"}
+    models: {backend: local, note: "FAST/VISION/REASON/EMBED 走本地端点; DETERMINISTIC 走 engine"}
+    asr_note: "Parakeet NIM 不支持 Blackwell/compute 12.0 自托管 → P0 用 FunASR/Qwen3-ASR"
+    storage: {db: postgres, vector: local-or-retrieever, artifacts: object-storage}
+    observability: {tracing: otlp, otlp: "http://collector:4318/v1/traces", gpu_metrics: DCGM}
+    guardrails: {backend: builtin}
+
+  C:
+    name: "NVIDIA production / lab"
+    desc: "NeMo Platform / Fabric + NIM + Retriever + Guardrails"
+    engine: {mode: http, url: "http://cnc-ai-brain:7862"}
+    agent_contract: {spec: "config/agent.yaml", apiVersion: "nemo.agents/v1"}
+    runtime: {fabric: NeMo-Fabric, serving: NIM}
+    models: {backend: nvidia, nim: "见 agent.yaml spec.models.nvidia_nim"}
+    rag: {backend: NeMo-Retriever}
+    guardrails: {backend: nemo, note: "对接真实 NeMo Guardrails; 内置规则作为兜底"}
+    storage: {db: postgres, vector: retrieever, artifacts: object-storage}
+    observability: {tracing: otlp, otlp: "http://otel-collector:4318/v1/traces", gpu_metrics: DCGM}
+    deploy: {compose: "deploy/docker-compose.yml", k8s: "deploy/k8s.yaml"}
+
+  D:
+    name: "Scaled ASR"
+    desc: "ASR 独立部署在实际支持 Parakeet 的 GPU 或其他本地 ASR; 上层协议不变"
+    engine: {mode: http, url: "http://cnc-ai-brain:7862"}
+    multimodal: {asr: "独立 ASR 服务 (Parakeet NIM on 受支持GPU / 或 FunASR 集群)"}
+    models: {backend: nvidia}
+    note: "仅 ASR 层扩展, Context/Skill/Agent API 与 Profile C 一致"
+
+# 当前默认 (本机 = Profile B 的在线子集 / 或 A 的离线兜底)
+default: B

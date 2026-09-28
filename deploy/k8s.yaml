@@ -1,0 +1,69 @@
+# k8s.yaml — Profile C (NVIDIA production/lab) 部署清单
+# 上传端口 API 的 Deployment + Service + ConfigMap 挂载。
+# engine/funasr 各自独立 Deployment (此处略), 通过 Service DNS 接线。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: uea-config
+data:
+  CNC_BRAIN_URL: "http://cnc-ai-brain:7862"
+  FUNASR_URL: "http://funasr-gui:8866"
+  UEA_PROFILE: "C"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: union-export-agent-api
+  labels: {app: uea-api, tier: control-plane}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: uea-api}
+  template:
+    metadata:
+      labels: {app: uea-api}
+      annotations:
+        # OTEL: 若有 collector, 用 sidecar/环境注入 OTLP endpoint
+        observability: "otel-json"
+    spec:
+      containers:
+        - name: api
+          image: union-export-agent:2.0.0-livekernel
+          ports: [{containerPort: 8900}]
+          envFrom: [{configMapRef: {name: uea-config}}]
+          readinessProbe:
+            httpGet: {path: /health, port: 8900}
+            initialDelaySeconds: 8
+            periodSeconds: 15
+          livenessProbe:
+            httpGet: {path: /health, port: 8900}
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          resources:
+            requests: {cpu: "500m", memory: "512Mi"}
+            limits: {cpu: "2", memory: "2Gi"}
+          volumeMounts:
+            - {name: data, mountPath: /app/data}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: uea-data-pvc}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: union-export-agent-api
+spec:
+  selector: {app: uea-api}
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8900
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: uea-data-pvc
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 5Gi}

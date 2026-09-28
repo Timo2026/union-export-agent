@@ -1,0 +1,27 @@
+{
+  "title": "Union Export Agent — 运维看板",
+  "uid": "uea-livekernel",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {"from": "now-6h", "to": "now"},
+  "panels": [
+    {"id": 1, "type": "stat", "title": "请求总数 (5m)", "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+     "targets": [{"expr": "sum(rate(uea_requests_total[5m]))", "refId": "A"}]},
+    {"id": 2, "type": "stat", "title": "HITL 触发率", "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+     "targets": [{"expr": "sum(rate(uea_hitl_triggers_total[5m]))/sum(rate(uea_requests_total[5m]))", "refId": "A"}],
+     "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.3}, {"color": "red", "value": 0.5}]}}}},
+    {"id": 3, "type": "stat", "title": "熔断器 OPEN 数", "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+     "targets": [{"expr": "sum(uea_circuit_open)", "refId": "A"}]},
+    {"id": 4, "type": "stat", "title": "护栏拦截数 (5m)", "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+     "targets": [{"expr": "sum(rate(uea_guardrail_blocks_total[5m]))", "refId": "A"}]},
+    {"id": 5, "type": "timeseries", "title": "技能 P95 时延 (ms)", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+     "targets": [{"expr": "histogram_quantile(0.95, sum(rate(uea_skill_duration_ms_bucket[5m])) by (le, skill))", "legendFormat": "{{skill}}", "refId": "A"}]},
+    {"id": 6, "type": "timeseries", "title": "验证状态分布 (PASS/HITL/BLOCKED)", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+     "targets": [{"expr": "sum(rate(uea_verification_status_total[5m])) by (status)", "legendFormat": "{{status}}", "refId": "A"}]},
+    {"id": 7, "type": "timeseries", "title": "引擎在线 vs 离线降级", "gridPos": {"h": 7, "w": 12, "x": 0, "y": 12},
+     "targets": [{"expr": "sum(rate(uea_engine_source_total[5m])) by (source)", "legendFormat": "{{source}}", "refId": "A"}]},
+    {"id": 8, "type": "timeseries", "title": "GPU 利用率 (DCGM, Profile C)", "gridPos": {"h": 7, "w": 12, "x": 12, "y": 12},
+     "targets": [{"expr": "avg(DCGM_FI_DEV_GPU_UTIL)", "legendFormat": "gpu_util", "refId": "A"}]}
+  ]
+}

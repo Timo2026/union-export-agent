@@ -1,0 +1,44 @@
+# docker-compose.yml — Profile B (DGX Spark P0) 编排
+# 三服务: engine(制造内核:7862) + funasr(多模态:8866) + api(上传端口:8900)
+# engine/funasr 镜像按各自仓库构建; 此处只声明接线与依赖顺序。
+version: "3.9"
+
+services:
+  engine:
+    image: cnc-ai-brain:12.0.0-fusion      # 由 _timo_engine 仓库构建 (含 OCP/cadquery)
+    container_name: uea-engine
+    ports: ["7862:7862"]
+    environment:
+      - PYTHONUTF8=1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:7862/api/health',timeout=4)"]
+      interval: 30s
+      timeout: 6s
+      retries: 5
+
+  funasr:
+    image: funasr-gui:latest               # C:\Users\<user>\funasr-gui 构建
+    container_name: uea-funasr
+    ports: ["8866:8866", "8089:8089", "1234:1234", "1278:1278"]
+    environment:
+      - PYTHONUTF8=1
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: uea-api
+    depends_on:
+      engine: {condition: service_healthy}
+      funasr: {condition: service_started}
+    ports: ["8900:8900"]
+    environment:
+      # 主干通过 settings.yaml 读端点; 容器内用服务名覆盖
+      - CNC_BRAIN_URL=http://engine:7862
+      - FUNASR_URL=http://funasr:8866
+      - PYTHONUTF8=1
+    volumes:
+      - uea-data:/app/data
+
+volumes:
+  uea-data:
