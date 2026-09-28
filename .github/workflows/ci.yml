@@ -43,6 +43,20 @@ jobs:
       - name: agent.yaml contract validation
         run: python -c "from services.agent_spec import load_agent_spec, validate; r=validate(load_agent_spec()); print(r); assert r['valid'], r['errors']"
 
+      # 防回归：交付的 shell 脚本必须在 Linux 上真能跑。
+      # 历史坑：scripts/verify_replica.sh 与 models/fetch_and_launch.sh 曾带 CRLF 行尾，
+      # 在 Linux 上直接语法报错（`set: pipefail: invalid option name`），
+      # 而当时的 CI 只跑 pytest、不跑任何 .sh，所以这个问题一路绿灯到公开仓。
+      - name: Shell 脚本可执行性 (无 CRLF + 语法检查)
+        run: |
+          bad=0
+          while IFS= read -r f; do
+            if grep -q $'\r' "$f"; then echo "CRLF 行尾: $f"; bad=1; fi
+            bash -n "$f" || bad=1
+          done < <(git ls-files '*.sh')
+          [ "$bad" = 0 ] || exit 1
+          echo "all .sh: LF-only + syntax OK"
+
   docs-check:
     name: 文档脱敏检查 (无节点地址/无凭据字面量)
     runs-on: ubuntu-latest
