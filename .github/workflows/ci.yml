@@ -37,7 +37,7 @@ jobs:
           UEA_FORCE_OFFLINE: "1"
         run: python -m pytest tests/ -q
 
-      - name: Skill inventory single source of truth (33/33 with tool.py)
+      - name: Skill inventory single source of truth (39/39 with tool.py)
         run: python scripts/count_skills.py --json
 
       - name: agent.yaml contract validation
