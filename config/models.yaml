@@ -1,0 +1,57 @@
+version: 2
+updated_at: '2026-09-23 10:20:12'
+models:
+  llm:
+    label: LLM · 推理/文本 (Omni 30B 统一端点)
+    role: REASON
+    endpoint: http://127.0.0.1:8002/v1
+    model: nemotron-omni-30b-a3b
+    enabled: true
+    probe_path: /models
+    usage: RFQ 抽取 / ReAct 规划 / 回复草稿 / 摘要 / 翻译 (LLM 提议, 引擎裁决)
+    note: 2026-09-24 起 :8002 带 --enable-auto-tool-choice --tool-call-parser qwen3_coder, 工具调用实测可用 (probe 200 + 正确 tool_calls); 此前「无 tool-calls」的记载已过期; fallback lane :8902 qwen3-0.6b (Omni 离线时低质真实续写顶班, 不 MOCK)
+    fallback:
+      endpoint: http://127.0.0.1:8902/v1
+      model: qwen3-0.6b
+  vlm:
+    label: VLM · 图纸视觉 (Omni)
+    role: VISION
+    endpoint: http://127.0.0.1:8002/v1
+    model: nemotron-omni-30b-a3b
+    enabled: true
+    probe_path: /models
+    note: Omni any-to-any 多模态; 图纸/图片感知只出事实不定价格; 兼覆盖图纸文字 OCR
+  embedding:
+    label: Embedding · 检索向量 (Embed-1B)
+    role: EMBED
+    endpoint: http://127.0.0.1:8011/v1
+    model: nemotron-embed-1b
+    enabled: true
+    probe_path: /models
+    note: '非对称双塔须带 query:/passage: 前缀 (rag_layers 配置驱动); 不可达则 HashEmbedder 显式 MOCK
+      降级'
+  ocr:
+    label: OCR · 图纸文字 (由 Omni VLM 覆盖)
+    role: OCR
+    endpoint: http://127.0.0.1:8002/v1
+    model: nemotron-omni-30b-a3b
+    enabled: false
+    probe_path: /models
+    note: 节点无独立 OCR 服务; 图纸文字由 vlm 角色 (Omni) 覆盖, 本档显式 disabled 不冒充
+  asr:
+    label: ASR · 语音转写 (Omni 音频路径)
+    role: ASR
+    endpoint: http://127.0.0.1:8002/v1
+    model: nemotron-omni-30b-a3b
+    enabled: true
+    probe_path: /models
+    note: 无专档流式 ASR, 蹭 Omni any-to-any 音频; 不可达则 funasr.allow_mock 显式降级
+  deterministic:
+    label: 确定性内核 · 报价/DFM (Timo)
+    role: DETERMINISTIC
+    endpoint: http://127.0.0.1:7862
+    model: calc_quote+ConflictChecker
+    enabled: true
+    probe_path: /api/health
+    locked: true
+    note: 铁律① Timo 引擎; 节点无监听时 health 失败 -> 自动走离线 byte-identical vendored kernel 兜底

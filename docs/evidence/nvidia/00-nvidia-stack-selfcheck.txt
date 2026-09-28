@@ -1,0 +1,68 @@
+# NVIDIA 全栈证据落盘 · 自检模板（v2.0 · vLLM 进程级 · Nemotron NVFP4）
+
+> 2026-09-20 改写：docker daemon 无权限 → NIM 容器路线关闭；本单为 **pip + vLLM + 裸进程 + tmux** 口径。
+> 采集命令在 Spark 节点逐行跑，输出粘回本地落盘。密级：公开 · **禁止写 NGC_API_KEY / 节点密码 / 内网 IP**。
+
+## 采集元信息
+- 节点: spark-51（仅编号） · 时间: ____________ · 采集人: ____
+- GPU + compute_cap: ____________（已核: GB10 / sm_(12,1) / 驱动 580.82.09 / CUDA 13.0 / 121GB 统一内存）
+- vLLM 版本: ____________（清华源 0.22–0.29 cp38-abi3 aarch64 wheel 候选）
+- torch: 2.14.0+cu130（已装，`available=True`；GPU 生成需 CPATH 指向用户态 libpython3.12-dev 头文件）
+
+## 1. 环境自检（W1 落档 00-env-selfcheck.txt）
+```
+nvidia-smi --query-gpu=name,compute_cap,memory.total,memory.free --format=csv
+python3 -V; df -h /; free -h; nproc
+docker info            # 预期: permission denied（已核实，记录原文）
+```
+
+## 2. 权重下载（tmux · hf-mirror · ~1.25MB/s · timo_ 前缀）
+```
+# 真实命令（huggingface_hub CLI，指向镜像端点；本地目录加 timo_ 前缀）
+export HF_ENDPOINT=https://hf-mirror.com
+# 批次① always-on（16GB ≈ 4h）
+hf download nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16 --local-dir ~/models/timo_nano4b            # 8.0GB/18f
+hf download nvidia/Nemotron-3-Embed-1B-BF16 --local-dir ~/models/timo_embed1b                   # 2.3GB/15f
+hf download nvidia/nemotron-3.5-asr-streaming-0.6b --local-dir ~/models/timo_asr06b             # 5.7GB/22f
+# 批次② 按需（44GB ≈ 10h）
+hf download nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4 --local-dir ~/models/timo_omni  # 22.4GB/26f (custom_code → trust_remote_code)
+hf download nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4 --local-dir ~/models/timo_lightning  # 21.6GB/70f
+```
+已知否决（禁止回流）：GGUF（无 FP4 tensor core 路径）、NVFP4-DSpark（1.35GB 非自包含）、nv-embedqa（NIM 已废）。
+
+## 3. 服务起服与探活（每角色一条）
+```
+# vLLM serve 示例（端口按 gateway 规划分配，写实况）
+curl -s http://127.0.0.1:8002/v1/models | python3 -m json.tool   # FAST  · Nano-4B-BF16
+curl -s http://127.0.0.1:8011/v1/models | python3 -m json.tool   # EMBED · Nemotron-3-Embed-1B-BF16
+curl -s http://127.0.0.1:8020/v1/models | python3 -m json.tool   # OMNI  · 30B-A3B-Reasoning-NVFP4
+curl -s http://127.0.0.1:8000/v1/models | python3 -m json.tool   # REASON· Lightning-30B-A3B-NVFP4
+curl -s http://127.0.0.1:7862/api/health                          # DETERMINISTIC · Timo（铁律①）
+```
+
+## 4. 端口汇总（填 config/models.nvidia-fullstack.yaml 用）
+| 角色 | 模型 | 实际端口 | 状态 |
+|------|------|---------|------|
+| FAST | Nemotron-3-Nano-4B-BF16 | :____ | ✅/❌ |
+| EMBED | Nemotron-3-Embed-1B-BF16 | :____ | ✅/❌ |
+| OMNI (VLM+ASR) | Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4 | :____ | ✅/❌ |
+| REASON | Nemotron-3.5-Lightning-30B-A3B-NVFP4 | :____ | ✅/❌ |
+| ASR | nemotron-3.5-asr-streaming-0.6b | :____ | ✅/❌ |
+| DETERMINISTIC | Timo cnc-ai-brain v12 | :7862 | ✅/❌ |
+
+## 5. 推理冒烟（MoE/多模态验证）
+```
+# 文本 + 记录 latency/tokens
+curl -s -X POST http://127.0.0.1:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"<实际模型ID>","messages":[{"role":"user","content":"Reply: VLLM_OK"}],"max_tokens":16}' \
+  | python3 -m json.tool
+# Omni 多模态：喂一张图纸/一段语音，确认 vision/audio modality 被接受
+```
+
+## 6. 门禁 → 启用矩阵（执行时勾选）
+| 门禁结果 | FAST | REASON | OMNI | EMBED | ASR | 口播 |
+|----------|------|--------|------|-------|-----|------|
+| vLLM+权重全绿 | Nano-4B | Lightning-NVFP4 | Omni-NVFP4 | Embed-1B | asr-0.6b | N2+ |
+| 部分绿 | Nano-4B | Nano-4B 兼 | mock 显式 | Embed-1B 或 hash 降级 | FunASR | N1+ |
+| 仅 smi | Qwen3-0.6B 冒烟 | 0.6B | mock | hash | mock | N0 |

@@ -1,0 +1,84 @@
+# 节点运行时模型注册表 · DGX Spark GB10 实测口径 (v2 · 2026-09-22)
+#
+# 这是什么 / 为什么单独一份:
+#   backend=local 时 model_router.py:94-103 经 choose_route() 读 **config/models.yaml**
+#   (键 llm/vlm/embedding/asr/deterministic), 完全不读 settings.model_router.roles。
+#   仓库自带 config/models.yaml 是开发机口径 (LMStudio / 旧 embed / 旧 ASR 端点),
+#   节点上这些端点全死。故节点部署 (T5) 必须以本文件覆盖节点的
+#   config/models.yaml, 否则所有 LLM 角色路由到死端点 -> 全链 offline。
+#
+#   部署: T5 上传本文件 -> 节点 config/models.yaml (覆盖开发机口径)。
+#   运行时单源仍是 config/models.yaml (PRD-S-MODEL F2: 只有 models.yaml 进 router);
+#   本文件是它的「节点风味」源, 与 settings.dgx-spark-nvidia.yaml 同属节点 Profile。
+#
+# v2 变更 (2026-09-22, user 拍板「放弃 30B, 全部接 Omni 30B」):
+#   原三驻拓扑 (Omni+Embed+30B) 实测不可行 —— Omni unified-memory 实占 73.5GB
+#   (配置 0.45 超计), 30B 任何 util 配方 (0.30/0.22/0.20) 都在 KV cache 分配期
+#   crash-loop (watchdog 22 次重启)。Omni 与 30B 同代同宗 (Nemotron-3 Nano 30B-A3B
+#   NVFP4, any-to-any), 统一 :8002 后单一推理端点、无内存争抢、联动链更短。
+#
+# 节点实测拓扑 (v2: Omni 唯一 LLM/VLM/ASR 端点, Embed + Timo 不变):
+#   llm (FAST/REASON) -> :8002  nemotron-omni-30b-a3b   Omni-30B-A3B NVFP4 (统一推理端点)
+#   vlm (VISION)      -> :8002  nemotron-omni-30b-a3b   Omni-30B-A3B NVFP4 (any-to-any)
+#   embedding (EMBED) -> :8011  nemotron-embed-1b       Embed-1B NVFP4 (非对称双塔, 需前缀)
+#   asr (ASR)         -> :8002  nemotron-omni-30b-a3b   Omni 音频路径 (专档流式未部署)
+#   deterministic     -> :7862  Timo 引擎 (铁律①锁死, 永不走 LLM)
+#
+# 铁律①: deterministic locked+enabled, 不可禁用/不可改 LLM (model_config.validate 强制)。
+
+version: 2
+updated_at: '2026-09-22 00:00:00'
+models:
+  llm:
+    label: LLM · 推理/文本 (Omni 30B 统一端点)
+    role: REASON
+    endpoint: http://127.0.0.1:8002/v1
+    model: nemotron-omni-30b-a3b
+    enabled: true
+    probe_path: /models
+    usage: RFQ 抽取 / ReAct 规划 / 回复草稿 / 摘要 / 翻译 (LLM 提议, 引擎裁决)
+    note: 2026-09-22 起 30B 弃用, FAST/REASON 统一 Omni :8002; 2026-09-24 实测 --enable-auto-tool-choice --tool-call-parser qwen3_coder 启用, tool-calls 可用 (calc_quote 参数正确, finish_reason=tool_calls); 推理模型先耗 reasoning token, 工具调用 max_tokens 须 ≥600 (200 会截断假阴性; llm_planner 统一预算+截断重试); fallback lane :8902 qwen3-0.6b (Omni 离线时低质真实续写顶班, 不 MOCK)
+    fallback:
+      endpoint: http://127.0.0.1:8902/v1
+      model: qwen3-0.6b
+  vlm:
+    label: VLM · 图纸视觉 (Omni)
+    role: VISION
+    endpoint: http://127.0.0.1:8002/v1
+    model: nemotron-omni-30b-a3b
+    enabled: true
+    probe_path: /models
+    note: Omni any-to-any 多模态; 图纸/图片感知只出事实不定价格; 兼覆盖图纸文字 OCR
+  embedding:
+    label: Embedding · 检索向量 (Embed-1B)
+    role: EMBED
+    endpoint: http://127.0.0.1:8011/v1
+    model: nemotron-embed-1b
+    enabled: true
+    probe_path: /models
+    note: "非对称双塔须带 query:/passage: 前缀 (rag_layers 配置驱动); 不可达则 HashEmbedder 显式 MOCK 降级"
+  ocr:
+    label: OCR · 图纸文字 (由 Omni VLM 覆盖)
+    role: OCR
+    endpoint: http://127.0.0.1:8002/v1
+    model: nemotron-omni-30b-a3b
+    enabled: false
+    probe_path: /models
+    note: 节点无独立 OCR 服务; 图纸文字由 vlm 角色 (Omni) 覆盖, 本档显式 disabled 不冒充
+  asr:
+    label: ASR · 语音转写 (Omni 音频路径)
+    role: ASR
+    endpoint: http://127.0.0.1:8002/v1
+    model: nemotron-omni-30b-a3b
+    enabled: true
+    probe_path: /models
+    note: 无专档流式 ASR, 蹭 Omni any-to-any 音频; 不可达则 funasr.allow_mock 显式降级
+  deterministic:
+    label: 确定性内核 · 报价/DFM (Timo)
+    role: DETERMINISTIC
+    endpoint: http://127.0.0.1:7862
+    model: calc_quote+ConflictChecker
+    enabled: true
+    probe_path: /api/health
+    locked: true
+    note: 铁律① Timo 引擎; 节点无监听时 health 失败 -> 自动走离线 byte-identical vendored kernel 兜底

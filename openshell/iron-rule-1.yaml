@@ -1,0 +1,40 @@
+policy_id: iron-rule-1
+description: 确定性工具拒绝 LLM/Director override (铁律①工程化)
+version: 1
+applies_to:
+  - check_dfm
+  - calc_quote
+  - verify_gate
+  - parse_rfq
+  - golden_chain
+  - supplier_match
+  - render_thumbnail
+  - submit_feedback
+enforce:
+  - skill.output 在 dispatch 记录后不可被 LLM/Dispatcher 二次改写
+  - calc_quote 的 unit_price/final_price 必须来自 Timo 内核返回值 (sha256 比对)
+  - check_dfm 的 conflicts/valid 必须来自 ConflictChecker, 不接受 LLM 补丁
+  - risk_score > 0.7 或 quote_total 超金额门禁 → 触发 hitl-required
+audit:
+  - 所有 iron-rule Skill 调用必须写入 skill_audit (含 output_sha256)
+  - 试图修改 locked 输出 → 记 violation 并拒绝该次 dispatch 返回
+locked: true
+
+# 锁定哈希前剥掉的每轮易变标识 (A6 修复)。清单来自节点实测深 diff: 同一输入两轮
+# golden_chain 输出仅 context_id/audit_head/audit_path/trace_id/export_path/
+# _latency_ms 及 reply.subject 内嵌 context_id 不同, 价格 281.25/365.62 完全一致。
+# openshell.py 的 _VOLATILE_KEYS 是缺省集, 此处只可追加不可减少 (铁律① fail-safe):
+# 追加后缺省仍生效, 漏配只会少剥不会开后门; 改价/翻 draft_only 等真篡改仍改变摘要被拦。
+volatile_keys:
+  - context_id
+  - dispatch_id
+  - session_id
+  - trace_id
+  - audit_head
+  - audit_path
+  - export_path
+  - _latency_ms
+  - _cache
+# _source (顶层运行时信封) 在代码里按 _TOP_LEVEL_ENVELOPE_KEYS 仅剥根层:
+# 缓存命中时 live:<engine> ↔ agent_cache 合法翻转 (skills/_runtime.py:220),
+# 载荷内 quote._source/dfm._source 仍锁定。故不列入本 YAML (此处为全局键)。

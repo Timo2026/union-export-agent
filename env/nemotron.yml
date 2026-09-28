@@ -1,0 +1,9 @@
+# nemotron 推理环境（vLLM 0.20 · Python 3.12 · CUDA 13）
+name: nemotron
+channels: [nvidia, conda-forge]
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - vllm==0.20.0          # -i https://pypi.tuna.tsinghua.edu.cn/simple（坑#1）
+      - torch==2.11.0+cu130

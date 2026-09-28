@@ -1,0 +1,1076 @@
+<!-- AI生成 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Union Manufacturing Export Agent · 工业非标外贸工作台 v7.1</title>
+  <link rel="stylesheet" href="css/workbench.css" />
+  <style>
+    /* v7.0 工作台扩展样式 (继承 workbench.css 品牌色 #76b900) */
+    .tab-view { display: none; overflow: auto; }
+    .tab-view.active { display: block; }
+    .page-pad { padding: 16px 18px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    @media (max-width: 1100px) { .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; } .grid-2 { grid-template-columns: 1fr; } }
+    @media (max-width: 720px)  { .grid-3, .grid-4, .grid-2 { grid-template-columns: 1fr; } }
+
+    /* 表格 */
+    .tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .tbl th { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line2);
+      color: var(--ink3); font-weight: 600; font-size: 11px; letter-spacing: .5px;
+      text-transform: uppercase; background: var(--panel); position: sticky; top: 0; z-index: 2; }
+    .tbl td { padding: 9px 10px; border-bottom: 1px solid var(--line); color: var(--ink2); vertical-align: middle; }
+    .tbl tbody tr:hover { background: #131b22; }
+    .tbl .ck { width: 34px; text-align: center; }
+    .tbl .num { font-family: var(--mono); text-align: right; }
+    .row-bar { display: flex; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line);
+      background: var(--panel); flex-wrap: wrap; align-items: center; }
+    .row-bar .grow { flex: 1; }
+    .row-bar input, .row-bar select {
+      padding: 6px 9px; border-radius: 4px; border: 1px solid var(--line2);
+      background: var(--bg); color: var(--ink); font-size: 12.5px; min-width: 120px; }
+    .row-bar input.wmin { min-width: 220px; }
+    .pager { display: flex; gap: 6px; align-items: center; padding: 10px 12px;
+      border-top: 1px solid var(--line); background: var(--panel); font-size: 12px; color: var(--ink3); }
+    .pager .grow { flex: 1; }
+    .pager button { padding: 4px 10px; font-size: 12px; }
+
+    .stat-big { font-size: 26px; font-weight: 800; font-family: var(--mono); color: var(--ink); }
+    .stat-big.acc { color: var(--acc); }
+    .stat-lbl { font-size: 11px; color: var(--ink3); margin-top: 4px; }
+
+    .pill-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
+    .pill-dot.on { background: var(--ok); box-shadow: 0 0 5px var(--ok); }
+    .pill-dot.off { background: var(--err); }
+    .muted { color: var(--ink3); }
+    .truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; display: inline-block; vertical-align: middle; }
+    .scroll-area { max-height: 420px; overflow: auto; }
+    .kv { display: grid; grid-template-columns: 110px 1fr; gap: 5px 10px; font-size: 12.5px; margin: 4px 0; }
+    .kv .k { color: var(--ink3); }
+    .badge-role { font-size: 9.5px; padding: 2px 6px; border-radius: 3px; background: rgba(118,185,0,.14); color: var(--acc); font-family: var(--mono); }
+
+    .empty-illus { text-align: center; padding: 48px 20px; color: var(--ink3); }
+    .empty-illus .ico { font-size: 44px; opacity: .5; display: block; margin-bottom: 12px; }
+    .empty-illus small { color: var(--ink3); opacity: .8; }
+
+    .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; inset: 0; background: var(--line2); border-radius: 22px; transition: .2s; }
+    .slider::before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background: var(--ink3); border-radius: 50%; transition: .2s; }
+    .switch input:checked + .slider { background: var(--acc); }
+    .switch input:checked + .slider::before { transform: translateX(18px); background: #0a0e12; }
+    .field-row { display: grid; grid-template-columns: 150px 1fr 120px; gap: 8px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); }
+    .field-row input[type=text] { padding: 7px 9px; border-radius: 4px; border: 1px solid var(--line2); background: var(--bg); color: var(--ink); font-size: 12px; width: 100%; }
+
+    .dropzone { border: 2px dashed var(--line2); border-radius: 8px; padding: 28px; text-align: center; color: var(--ink3); cursor: pointer; transition: .2s; }
+    .dropzone:hover, .dropzone.drag { border-color: var(--acc); color: var(--acc); background: rgba(118,185,0,.04); }
+    .rag-hit, .web-hit { border: 1px solid var(--line); border-radius: 5px; padding: 10px 12px; margin-bottom: 8px; background: var(--panel2); }
+    .rag-hit .h, .web-hit .h { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+    .rag-hit .score { font-family: var(--mono); color: var(--acc); font-size: 11px; }
+    .web-hit a { color: var(--chat); text-decoration: none; font-size: 12.5px; }
+    .web-hit a:hover { text-decoration: underline; }
+    .inspector-zone { border: 1px solid var(--line); border-radius: 5px; margin: 8px 12px; background: var(--panel); }
+    .inspector-zone > h4 { padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink); display: flex; gap: 8px; align-items: center; }
+    .inspector-zone > .body { padding: 10px 12px; }
+    .chart-bar { display: flex; align-items: end; gap: 6px; height: 120px; padding: 8px 0; }
+    .chart-bar .bar { flex: 1; background: linear-gradient(180deg, var(--acc), var(--accdim)); border-radius: 3px 3px 0 0; min-height: 2px; position: relative; }
+    .chart-bar .bar .v { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--ink3); font-family: var(--mono); }
+
+    .inbox-layout { display: grid; grid-template-columns: minmax(300px, 32%) 1fr minmax(300px, 28%); height: calc(100vh - 130px); }
+    @media (max-width: 1100px) { .inbox-layout { grid-template-columns: 1fr; height: auto; } .inbox-layout .col { max-height: 460px; } }
+  </style>
+</head>
+<body>
+<p data-aigc-mark="1" style="margin:0 0 8px;font-size:10px;line-height:1.3;color:#6b6560;font-weight:400;">AI生成</p>
+
+<div class="app">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">UE</div>
+      <div>
+        <b>Union Export Agent</b>
+        <span class="ver">v7.1 · 工业非标外贸工作台</span>
+      </div>
+    </div>
+    <nav class="nav" id="navTabs">
+      <button class="active" data-tab="dashboard">📊 总览</button>
+      <button data-tab="inbox">📬 询盘邮件</button>
+      <button data-tab="orders">📦 订单客户</button>
+      <button data-tab="drawings">📐 图纸预览</button>
+      <button data-tab="rag">🧠 RAG 知识库</button>
+      <button data-tab="models">⚙️ 模型设置</button>
+      <button data-tab="status">🩺 本地状态</button>
+    </nav>
+    <div class="top-right">
+      <input class="search" placeholder="⌘K 命令面板" onclick="openPalette()" readonly />
+      <span class="health" id="healthBar"><span class="pill-dot off"></span>检测中</span>
+      <button class="iconbtn" title="刷新" onclick="refreshAll()">⟳</button>
+    </div>
+  </div>
+
+  <!-- GOLDEN CHAIN -->
+  <div class="golden-chain" id="goldenChain">
+    <span class="gc-step" data-step="INTAKE"><span class="dot">1</span>INTAKE 询盘</span><span class="gc-arrow">→</span>
+    <span class="gc-step" data-step="PARSE"><span class="dot">2</span>PARSE 解析</span><span class="gc-arrow">→</span>
+    <span class="gc-step" data-step="DFM"><span class="dot">3</span>DFM 可制造</span><span class="gc-arrow">→</span>
+    <span class="gc-step" data-step="QUOTE"><span class="dot">4</span>QUOTE 报价</span><span class="gc-arrow">→</span>
+    <span class="gc-step" data-step="VERIFY"><span class="dot">5</span>VERIFY 门禁</span><span class="gc-arrow">→</span>
+    <span class="gc-step" data-step="REPLY"><span class="dot">6</span>REPLY 回复</span><span class="gc-arrow">→</span>
+    <span class="gc-step" data-step="CRM"><span class="dot">7</span>CRM 复盘</span>
+    <span class="gc-phase" id="gcPhase">idle</span>
+  </div>
+
+  <!-- TAB CONTENTS -->
+  <main style="overflow:auto;min-height:0">
+
+    <!-- DASHBOARD -->
+    <section class="tab-view active" id="tab-dashboard">
+      <div class="page-pad">
+        <div class="grid-4" style="margin-bottom:14px">
+          <div class="card"><div class="stat-big acc" id="kpiEmails">—</div><div class="stat-lbl">询盘邮件 (收件箱)</div></div>
+          <div class="card"><div class="stat-big" id="kpiOrders">—</div><div class="stat-lbl">订单 / 上下文</div></div>
+          <div class="card"><div class="stat-big" id="kpiCustomers">—</div><div class="stat-lbl">客户 (飞轮沙箱)</div></div>
+          <div class="card"><div class="stat-big acc" id="kpiWinRate">—</div><div class="stat-lbl">赢单率 (飞轮)</div></div>
+        </div>
+        <div class="grid-2" style="margin-bottom:14px">
+          <div class="card">
+            <h4>🛡 模型服务状态 <span class="hint">(omni + embedding + ASR + 内核)</span></h4>
+            <div id="modelMiniStatus"><div class="muted">加载中…</div></div>
+          </div>
+          <div class="card">
+            <h4>📈 订单状态分布</h4>
+            <div id="orderDist"><div class="muted">加载中…</div></div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <h4>📬 最近询盘 <button class="btn" style="padding:3px 9px;font-size:11px;float:right" onclick="switchTab('inbox')">查看全部 →</button></h4>
+            <div id="recentEmails"><div class="muted">加载中…</div></div>
+          </div>
+          <div class="card">
+            <h4>📦 最近订单 <button class="btn" style="padding:3px 9px;font-size:11px;float:right" onclick="switchTab('orders')">查看全部 →</button></h4>
+            <div id="recentOrders"><div class="muted">加载中…</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INBOX -->
+    <section class="tab-view" id="tab-inbox">
+      <div class="inbox-layout">
+        <div class="col">
+          <div class="row-bar">
+            <input class="wmin grow" id="ibSearch" type="search" placeholder="🔍 搜索发件人/主题…" oninput="ibApplyFilter()" />
+            <select id="ibFilter" onchange="ibApplyFilter()">
+              <option value="">全部状态</option>
+              <option value="NEW">NEW 新件</option>
+              <option value="PASS">PASS 通过</option>
+              <option value="HITL">HITL 待审</option>
+              <option value="BLOCKED">BLOCKED 拦截</option>
+            </select>
+          </div>
+          <div class="row-bar" style="padding:6px 12px">
+            <label class="check" style="margin:0"><input type="checkbox" id="ibSelectAll" onclick="ibToggleAll(this.checked)" /> 全选</label>
+            <span class="muted" id="ibSelCount" style="font-size:11px">已选 0</span>
+            <span class="grow"></span>
+            <button class="btn" style="padding:4px 9px;font-size:11px" onclick="ibBatch('verify')">批量门禁</button>
+          </div>
+          <div class="scroll" id="inboxList"><div class="empty-illus"><span class="ico">📭</span>加载中…</div></div>
+          <div class="pager">
+            <span class="grow" id="ibPageInfo">—</span>
+            <button onclick="ibPrev()">‹ 上一页</button>
+            <button onclick="ibNext()">下一页 ›</button>
+          </div>
+        </div>
+        <div class="col">
+          <div class="insp-tabs" id="ibTabs">
+            <button class="insp-tab active" data-zone="overview">概览</button>
+            <button class="insp-tab" data-zone="customer">客户</button>
+            <button class="insp-tab" data-zone="geometry">几何</button>
+            <button class="insp-tab" data-zone="rag">RAG</button>
+            <button class="insp-tab" data-zone="commercial">报价</button>
+            <button class="insp-tab" data-zone="verification">门禁</button>
+            <button class="insp-tab" data-zone="hitl">HITL</button>
+          </div>
+          <div class="scroll" id="inspectorBody">
+            <div class="empty-illus"><span class="ico">👈</span>从左侧选一封询盘邮件<br><small>展开 8 区聚合上下文</small></div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="col-head"><span class="col-title">🤖 Agent 助手</span><span class="col-meta">session ✓</span></div>
+          <div class="chat-wrap">
+            <div id="chatThread" class="scroll" style="padding:10px 12px"></div>
+            <div id="chatInput">
+              <div id="quickChips">
+                <span class="tag" onclick="agentQuick('算报价')">算报价</span>
+                <span class="tag" onclick="agentQuick('跑门禁')">跑门禁</span>
+                <span class="tag" onclick="agentQuick('起草回复')">起草回复</span>
+                <span class="tag" onclick="agentQuick('查客户历史')">查客户</span>
+                <span class="tag" onclick="agentQuick('联网尽调')">联网尽调</span>
+              </div>
+              <div style="margin-top:6px"><textarea id="chatTa" placeholder="输入指令… (Enter 发送)" style="width:100%;min-height:50px"></textarea></div>
+              <div style="margin-top:6px;display:flex;gap:6px">
+                <button class="btn primary" onclick="agentSend()">▶ 发送</button>
+                <span class="muted" style="font-size:10px;align-self:center">iron-rule① 报价不走 LLM</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ORDERS -->
+    <section class="tab-view" id="tab-orders">
+      <div class="row-bar">
+        <input class="wmin" id="odSearch" type="search" placeholder="🔍 搜索订单号/客户/标题…" oninput="odDebounced()" />
+        <select id="odState" onchange="odLoad(1)">
+          <option value="">全部状态</option>
+          <option value="inquiry">询盘</option>
+          <option value="quote">报价</option>
+          <option value="sample">样品</option>
+          <option value="batch">批量</option>
+          <option value="shipped">发货</option>
+          <option value="closed">完结</option>
+          <option value="lost">丢单</option>
+        </select>
+        <select id="odSort" onchange="odLoad(1)">
+          <option value="-created_at">最新优先</option>
+          <option value="created_at">最早优先</option>
+          <option value="-amount_usd">金额降序</option>
+          <option value="amount_usd">金额升序</option>
+        </select>
+        <span class="grow"></span>
+        <button class="btn" onclick="odLoad(S.od.page)">⟳ 刷新</button>
+        <button class="btn" onclick="odExport()">⬇ 导出 CSV</button>
+      </div>
+      <div class="row-bar" style="padding:6px 12px">
+        <label class="check" style="margin:0"><input type="checkbox" id="odSelectAll" onclick="odToggleAll(this.checked)" /> 全选</label>
+        <span class="muted" id="odSelCount" style="font-size:11px">已选 0</span>
+        <span class="muted" style="font-size:11px">批量流转→</span>
+        <select id="odBatchStatus" style="padding:4px 8px;font-size:11px">
+          <option value="quote">报价</option>
+          <option value="sample">样品</option>
+          <option value="batch">批量</option>
+          <option value="shipped">发货</option>
+          <option value="closed">完结</option>
+          <option value="lost">丢单</option>
+        </select>
+        <button class="btn primary" style="padding:4px 9px;font-size:11px" onclick="odBatchTransition()">▶ 执行</button>
+        <button class="btn danger" style="padding:4px 9px;font-size:11px" onclick="odBatchDelete()">🗑 删除</button>
+      </div>
+      <div class="scroll" style="max-height:calc(100vh - 250px)">
+        <table class="tbl">
+          <thead><tr>
+            <th class="ck"></th><th>订单号</th><th>客户</th><th>标题 / 关联RFQ</th>
+            <th class="num">数量</th><th class="num">金额</th><th>币种</th>
+            <th>状态</th><th>来源</th><th>创建时间</th>
+          </tr></thead>
+          <tbody id="ordersBody"><tr><td colspan="11" style="padding:30px;text-align:center" class="muted">加载中…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span class="grow" id="odPageInfo">—</span>
+        <select id="odPageSize" onchange="odLoad(1)" style="padding:4px 8px">
+          <option value="20">20 / 页</option>
+          <option value="50">50 / 页</option>
+          <option value="100">100 / 页</option>
+        </select>
+        <button onclick="odPrev()">‹</button><span id="odPager">1</span><button onclick="odNext()">›</button>
+      </div>
+    </section>
+
+    <!-- DRAWINGS -->
+    <section class="tab-view" id="tab-drawings">
+      <div class="page-pad">
+        <div class="grid-2" style="grid-template-columns:380px 1fr;align-items:start">
+          <div class="card">
+            <h4>📤 上传 STEP/STP 文件 <span class="hint">→ 几何 + 3D 缩略图</span></h4>
+            <div class="dropzone" id="dropZone" onclick="document.getElementById('stepFile').click()">
+              <div style="font-size:28px">📐</div>
+              <div style="margin-top:6px">点击或拖拽 <code>.step</code> / <code>.stp</code></div>
+              <div class="muted" style="font-size:11px;margin-top:6px">OCP B-rep · bbox/体积/重量/特征</div>
+            </div>
+            <input type="file" id="stepFile" accept=".step,.stp" style="display:none" onchange="uploadStep(this.files[0])" />
+            <div id="uploadProgress" style="margin-top:10px"></div>
+            <div id="stepPreview" style="margin-top:14px"></div>
+          </div>
+          <div class="card">
+            <h4>🔍 客户尽调 / RAG / 联网信息</h4>
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+              <input class="grow" id="dwSearch" type="search" placeholder="输入关键词: 材料/工艺/客户/市场…" style="padding:8px 10px;border-radius:5px;border:1px solid var(--line2);background:var(--bg);color:var(--ink)" onkeydown="if(event.key==='Enter')dwSearch()" />
+              <select id="dwScope" style="padding:8px 10px;border-radius:5px;border:1px solid var(--line2);background:var(--panel2);color:var(--ink)">
+                <option value="rag">📚 本地 RAG</option>
+                <option value="web">🌐 联网搜索</option>
+                <option value="both">📚 + 🌐 双路</option>
+              </select>
+              <button class="btn primary" onclick="dwSearch()">搜索</button>
+            </div>
+            <div id="dwResults"><div class="muted">输入关键词开始搜索…</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RAG -->
+    <section class="tab-view" id="tab-rag">
+      <div class="page-pad">
+        <div class="grid-2" style="margin-bottom:14px">
+          <div class="card">
+            <h4>📤 入库多模态文档 <span class="hint">邮件/PDF/Excel/图片/音频 → embedding</span></h4>
+            <div class="dropzone" id="ragDrop" onclick="document.getElementById('ragFile').click()">
+              <div style="font-size:28px">🧠</div>
+              <div style="margin-top:6px">拖拽任意文件入库</div>
+            </div>
+            <input type="file" id="ragFile" style="display:none" onchange="ragIngest(this.files[0])" />
+            <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <input id="ragCid" type="text" placeholder="客户ID (可选)" style="padding:7px 9px;border-radius:4px;border:1px solid var(--line2);background:var(--bg);color:var(--ink);font-size:12px" />
+              <input id="ragTags" type="text" placeholder="标签 (逗号)" style="padding:7px 9px;border-radius:4px;border:1px solid var(--line2);background:var(--bg);color:var(--ink);font-size:12px" />
+            </div>
+            <div id="ragIngestStatus" style="margin-top:8px"></div>
+          </div>
+          <div class="card">
+            <h4>🔍 语义检索 <span class="hint">客户 RAG + 联网双路</span></h4>
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+              <input class="grow" id="ragQuery" type="search" placeholder="问题/关键词…" style="padding:8px 10px;border-radius:5px;border:1px solid var(--line2);background:var(--bg);color:var(--ink)" onkeydown="if(event.key==='Enter')ragSearch()" />
+              <button class="btn primary" onclick="ragSearch()">📚 RAG</button>
+              <button class="btn" onclick="ragWebSearch()">🌐 联网</button>
+            </div>
+            <div id="ragSearchResult" style="max-height:300px;overflow:auto"><div class="muted">输入问题检索客户知识库…</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>📚 已入库文档库 <span class="hint" id="ragDocCount">—</span>
+            <button class="btn" style="padding:3px 9px;font-size:11px;float:right" onclick="ragLoadDocs()">⟳ 刷新</button>
+          </h4>
+          <input id="ragDocFilter" type="search" placeholder="筛选文档…" style="width:100%;margin-bottom:8px;padding:6px 9px;border-radius:4px;border:1px solid var(--line2);background:var(--bg);color:var(--ink);font-size:12px" oninput="ragFilterDocs()" />
+          <div class="scroll-area" id="ragDocsList"><div class="muted">加载中…</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MODELS -->
+    <section class="tab-view" id="tab-models">
+      <div class="page-pad">
+        <div class="card">
+          <h4>🎯 L3 Model Mesh — Omni + Embedding + 全角色 <span class="hint">iron-rule① 确定性内核锁定</span></h4>
+          <div class="muted" style="margin-bottom:10px;font-size:11px">主要使用 <b>omni 模型 (VLM 多模态推理)</b> + <b>embedding 模型 (检索向量)</b>。改动端点/模型名 → 保存 → 运行时自动重载。</div>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button class="btn primary" onclick="modelsSave()">💾 保存配置</button>
+            <button class="btn" onclick="modelsProbe()">🔌 探活全部</button>
+            <span class="muted" style="font-size:11px;align-self:center" id="modelsSaveHint"></span>
+          </div>
+          <div id="modelsList"><div class="muted">加载中…</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATUS -->
+    <section class="tab-view" id="tab-status">
+      <div class="page-pad">
+        <div class="grid-3" style="margin-bottom:14px">
+          <div class="card"><h4>🩺 服务健康</h4><div id="stHealth"><div class="muted">加载中…</div></div></div>
+          <div class="card"><h4>💾 Agent Cache</h4><div id="stCache"><div class="muted">加载中…</div></div></div>
+          <div class="card"><h4>⚙️ 配置热载</h4><div id="stConfig"><div class="muted">加载中…</div></div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><h4>📬 邮件后台链路 <button class="btn" style="padding:3px 9px;font-size:11px;float:right" onclick="loadStatus()">⟳</button></h4><div id="stMailPuller"><div class="muted">加载中…</div></div></div>
+          <div class="card"><h4>📜 最近 Trace <button class="btn" style="padding:3px 9px;font-size:11px;float:right" onclick="loadTraces()">⟳</button></h4><div id="stTraces" class="scroll-area"><div class="muted">点击刷新加载…</div></div></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- STATUS BAR -->
+  <div class="statusbar">
+    <span id="sbEngine">engine: —</span><span>·</span>
+    <span id="sbMultimodal">multimodal: —</span><span>·</span>
+    <span id="sbCache">cache: —</span><span>·</span>
+    <span id="sbCtx">contexts: —</span>
+    <span class="iron">🔒 iron-rule-1 LOCKED · data-stays-local</span>
+  </div>
+</div>
+
+<div id="palette" style="position:fixed;inset:0;background:rgba(4,6,8,.72);display:none;justify-content:center;align-items:flex-start;padding-top:14vh;z-index:90">
+  <div style="width:520px;max-width:calc(100vw - 40px);background:var(--panel);border:1px solid var(--line2);border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden">
+    <input id="palInput" placeholder="跳转标签 / 搜索… (Esc 关闭)" oninput="palFilter()" style="width:100%;border:none;border-bottom:1px solid var(--line);padding:13px 14px;font-size:13px;background:transparent;color:var(--ink)" />
+    <div id="palList" style="max-height:340px;overflow:auto;padding:6px"></div>
+  </div>
+</div>
+
+<div id="toastHost"></div>
+
+<script>
+/* ========== 工具 ========== */
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtTime = (t) => { if (!t) return "—"; const d = new Date(t * 1000); return d.toLocaleString("zh-CN", {month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}); };
+const fmtMoney = (v, c) => (v == null || v === "") ? "—" : `${Number(v).toLocaleString()} ${c || ""}`.trim();
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+async function jget(url) { const r = await fetch(url); if (!r.ok) throw new Error(url + " → " + r.status); return r.json(); }
+async function jpost(url, body, isForm) {
+  const opt = { method: "POST", headers: isForm ? {} : {"Content-Type":"application/json"}, body: isForm ? body : JSON.stringify(body || {}) };
+  const r = await fetch(url, opt); if (!r.ok) throw new Error(url + " → " + r.status); return r.json();
+}
+function toast(msg, kind) {
+  const el = document.createElement("div");
+  el.className = "toast" + (kind ? " " + kind : "");
+  el.textContent = msg;
+  $("#toastHost").appendChild(el);
+  setTimeout(() => el.remove(), 2800);
+}
+
+/* ========== 全局状态 ========== */
+const S = {
+  emails: [], emailsFiltered: [],
+  ib: { page: 1, pageSize: 15, sel: new Set(), zone: "overview", current: null, ctx: null },
+  od: { page: 1, pageSize: 20, total: 0, pages: 1, sel: new Set(), rows: [] },
+  ragDocs: [],
+};
+
+/* ========== 导航 ========== */
+function switchTab(name) {
+  $$(".nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  $$(".tab-view").forEach(v => v.classList.toggle("active", v.id === "tab-" + name));
+  $("#palette").style.display = "none";
+  if (name === "dashboard") loadDashboard();
+  if (name === "inbox") loadInbox();
+  if (name === "orders") odLoad(S.od.page);
+  if (name === "rag") ragLoadDocs();
+  if (name === "models") loadModels();
+  if (name === "status") loadStatus();
+}
+$$(".nav button").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+
+/* 命令面板 */
+function openPalette() { $("#palette").style.display = "flex"; $("#palInput").value = ""; palFilter(); $("#palInput").focus(); }
+const PAL_ITEMS = [
+  {k:"dashboard", t:"📊 总览仪表盘"}, {k:"inbox", t:"📬 询盘邮件"}, {k:"orders", t:"📦 订单客户"},
+  {k:"drawings", t:"📐 图纸预览"}, {k:"rag", t:"🧠 RAG 知识库"}, {k:"models", t:"⚙️ 模型设置"}, {k:"status", t:"🩺 本地状态"},
+];
+function palFilter() {
+  const q = $("#palInput").value.trim().toLowerCase();
+  const items = PAL_ITEMS.filter(i => !q || i.t.toLowerCase().includes(q));
+  $("#palList").innerHTML = items.map((i, idx) =>
+    `<div class="pal-item" onclick="switchTab('${i.k}');$('#palette').style.display='none'"><span class="pl">${i.t}</span><span class="pk">Tab ${idx+1}</span></div>`
+  ).join("") || '<div class="pal-item muted">无匹配</div>';
+}
+$("#palInput").addEventListener("keydown", e => { if (e.key === "Escape") $("#palette").style.display = "none"; if (e.key === "Enter") { const f = $$("#palList .pal-item")[0]; if (f) f.click(); } });
+document.addEventListener("keydown", e => { if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); openPalette(); } });
+
+/* ========== 健康检查 ========== */
+async function loadHealth() {
+  try {
+    const h = await jget("/health");
+    $("#healthBar").innerHTML = '<span class="pill-dot on"></span>在线';
+    $("#sbEngine").textContent = "engine: " + (h.engine || "—");
+    $("#sbMultimodal").textContent = "multimodal: " + (h.multimodal || "—");
+    $("#sbCtx").textContent = "contexts: " + (h.contexts ?? "—");
+  } catch (e) {
+    $("#healthBar").innerHTML = '<span class="pill-dot off"></span>离线';
+    toast("/health 不可达: " + e.message, "err");
+  }
+  try {
+    const c = await jget("/v1/cache/stats");
+    $("#sbCache").textContent = `cache: ${c.size}/${c.max_size} · hit ${((c.hit_rate||0)*100).toFixed(0)}%`;
+  } catch { $("#sbCache").textContent = "cache: —"; }
+}
+function refreshAll() { loadHealth(); const active = $(".nav button.active").dataset.tab; switchTab(active); toast("已刷新", "ok"); }
+
+/* ========== DASHBOARD ========== */
+async function loadDashboard() {
+  try { const ib = await jget("/v1/mail/inbox?limit=1"); $("#kpiEmails").textContent = ib.count || 0; } catch { $("#kpiEmails").textContent = "—"; }
+  try { const od = await jget("/v1/orders?page=1&size=1"); $("#kpiOrders").textContent = od.total || 0; } catch { $("#kpiOrders").textContent = "—"; }
+  try {
+    const fw = await jget("/v1/flywheel/stats");
+    $("#kpiCustomers").textContent = fw.total_customers || 0;
+    $("#kpiWinRate").textContent = ((fw.overall_win_rate || 0) * 100).toFixed(0) + "%";
+  } catch { $("#kpiCustomers").textContent = "—"; $("#kpiWinRate").textContent = "—"; }
+
+  try { const mc = await jget("/v1/models/config"); renderModelMini(mc.probe || {}); } catch { $("#modelMiniStatus").innerHTML = '<div class="muted">模型配置不可达</div>'; }
+  try { const all = await jget("/v1/orders?page=1&size=100&sort=-created_at"); renderOrderDist(all.items || [], all.status_zh); } catch { $("#orderDist").innerHTML = '<div class="muted">订单数据不可达</div>'; }
+
+  try {
+    const ib = await jget("/v1/mail/inbox?limit=5");
+    $("#recentEmails").innerHTML = (ib.items || []).map(it => `
+      <div class="sk-item" onclick="switchTab('inbox')">
+        <div class="sk-ico">📬</div>
+        <div class="sk-body">
+          <div class="sk-name">${esc((it.from||"").split("<")[0].trim())} <span class="muted" style="font-weight:400">· ${fmtTime(it.received_at)}</span></div>
+          <div class="sk-desc truncate">${esc(it.subject || "")}</div>
+        </div>
+      </div>`).join("") || '<div class="muted">无邮件</div>';
+  } catch { $("#recentEmails").innerHTML = '<div class="muted">收件箱不可达</div>'; }
+
+  try {
+    const od = await jget("/v1/orders?page=1&size=5&sort=-created_at");
+    $("#recentOrders").innerHTML = (od.items || []).map(o => `
+      <div class="sk-item" onclick="switchTab('orders')">
+        <div class="sk-ico">📦</div>
+        <div class="sk-body">
+          <div class="sk-name">${esc(o.customer_name || "—")} <span class="sk-id">${esc((o.id||"").slice(0,18))}</span></div>
+          <div class="sk-desc">${esc(o.title||"").slice(0,40)} · ${o.amount_usd!=null?"$"+Number(o.amount_usd).toLocaleString():"—"} · <span class="badge-role">${esc(STATUS_ZH[o.status]||o.status||"—")}</span></div>
+        </div>
+      </div>`).join("") || '<div class="muted">无订单</div>';
+  } catch { $("#recentOrders").innerHTML = '<div class="muted">订单不可达</div>'; }
+}
+
+function renderModelMini(probe) {
+  const keys = ["llm","vlm","embedding","asr","deterministic"];
+  const labels = {llm:"LLM 推理", vlm:"VLM/Omni 视觉", embedding:"Embedding 检索", asr:"ASR 语音", deterministic:"确定性内核"};
+  $("#modelMiniStatus").innerHTML = keys.map(k => {
+    const p = probe[k] || {}; const on = p.online;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)">
+      <span class="pill-dot ${on?"on":"off"}"></span>
+      <span style="width:130px">${labels[k]||k}</span>
+      <span class="mono muted" style="font-size:11px">${esc(p.model||"—")}</span>
+      <span style="flex:1"></span>
+      <span class="mono ${on?"":"err"}" style="font-size:11px">${on ? (p.latency_ms!=null?p.latency_ms+"ms":"online") : "offline"}</span>
+    </div>`;
+  }).join("");
+}
+
+function renderOrderDist(items, statusZh) {
+  const zhMap = statusZh || {};
+  const dist = {};
+  items.forEach(o => { const s = o.status || "unknown"; dist[s] = (dist[s]||0) + 1; });
+  const entries = Object.entries(dist).sort((a,b) => b[1]-a[1]);
+  if (!entries.length) { $("#orderDist").innerHTML = '<div class="muted">无订单数据</div>'; return; }
+  const max = Math.max(...entries.map(e => e[1]));
+  $("#orderDist").innerHTML = `<div class="chart-bar">` + entries.map(([s,n]) =>
+    `<div class="bar" style="height:${(n/max*100).toFixed(0)}%" title="${esc(zhMap[s]||s)}: ${n}"><span class="v">${n}</span></div>`
+  ).join("") + `</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">${entries.map(([s,n]) =>
+    `<span class="tag">${esc(zhMap[s]||s)} <b style="color:var(--ink)">${n}</b></span>`).join("")}</div>`;
+}
+
+/* ========== INBOX ========== */
+async function loadInbox() {
+  $("#inboxList").innerHTML = '<div class="empty-illus"><span class="ico">📡</span>拉取收件箱…</div>';
+  try {
+    const d = await jget("/v1/mail/inbox?limit=100");
+    S.emails = d.items || []; S.ib.sel.clear();
+    ibApplyFilter();
+  } catch (e) { $("#inboxList").innerHTML = `<div class="err">/v1/mail/inbox 失败: ${esc(e.message)}</div>`; }
+}
+function ibApplyFilter() {
+  const q = $("#ibSearch").value.trim().toLowerCase();
+  const f = $("#ibFilter").value;
+  S.emailsFiltered = S.emails.filter(it => {
+    if (q && !(`${it.from} ${it.subject} ${it.mail_id}`.toLowerCase().includes(q))) return false;
+    if (f) { const badges = (it.badges || []).join(" "); const pend = (it.pending && it.pending.state) || ""; if (!badges.includes(f) && !pend.includes(f)) return false; }
+    return true;
+  });
+  S.ib.page = 1; ibRender();
+}
+function ibRender() {
+  const { page, pageSize } = S.ib; const list = S.emailsFiltered; const total = list.length;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const slice = list.slice((page-1)*pageSize, page*pageSize);
+  if (!total) {
+    $("#inboxList").innerHTML = '<div class="empty-illus"><span class="ico">📭</span>空收件箱<small>上传 .eml 或触发黄金场景生成询盘</small></div>';
+  } else if (!slice.length) {
+    $("#inboxList").innerHTML = '<div class="empty-illus"><span class="ico">🔍</span>无匹配邮件<small>调整搜索/筛选条件</small></div>';
+  } else {
+    $("#inboxList").innerHTML = slice.map(it => {
+      const checked = S.ib.sel.has(it.mail_id) ? "checked" : "";
+      const badgeHtml = (it.badges || []).map(b => {
+        const cls = b.includes("BLOCKED") ? "err" : b.includes("HITL") ? "warn" : (b.includes("PASS")||b.includes("DONE")) ? "ok" : "";
+        return `<span class="tag ${cls}">${esc(b)}</span>`;
+      }).join(" ");
+      return `<button class="mail ${S.ib.current===it.mail_id?"active":""}" onclick="openMail('${esc(it.mail_id)}')">
+        <div class="mrow">
+          <label class="check" style="margin:0" onclick="event.stopPropagation()"><input type="checkbox" ${checked} onchange="ibToggle('${esc(it.mail_id)}', this.checked)" /></label>
+          <span class="msub truncate">${esc(it.subject || "(无主题)")}</span>
+          <span class="mtime">${fmtTime(it.received_at)}</span>
+        </div>
+        <div class="mfrom">${esc((it.from||"").split("<")[0].trim())} · ${it.attachments_count||0} 附件</div>
+        <div class="mbadges">${badgeHtml}</div>
+      </button>`;
+    }).join("");
+  }
+  $("#ibPageInfo").textContent = total ? `第 ${page}/${pages} 页 · 共 ${total} 封` : "0 封";
+  $("#ibSelectAll").checked = slice.length > 0 && slice.every(it => S.ib.sel.has(it.mail_id));
+  $("#ibSelCount").textContent = `已选 ${S.ib.sel.size}`;
+}
+function ibToggle(mid, on) { on ? S.ib.sel.add(mid) : S.ib.sel.delete(mid); ibRender(); }
+function ibToggleAll(on) {
+  const slice = S.emailsFiltered.slice((S.ib.page-1)*S.ib.pageSize, S.ib.page*S.ib.pageSize);
+  slice.forEach(it => on ? S.ib.sel.add(it.mail_id) : S.ib.sel.delete(it.mail_id));
+  ibRender();
+}
+function ibPrev() { if (S.ib.page > 1) { S.ib.page--; ibRender(); } }
+function ibNext() { const max = Math.ceil(S.emailsFiltered.length / S.ib.pageSize); if (S.ib.page < max) { S.ib.page++; ibRender(); } }
+async function ibBatch(action) {
+  const ids = Array.from(S.ib.sel);
+  if (!ids.length) { toast("请先勾选邮件", "err"); return; }
+  toast(`批量${action} ${ids.length} 封…`);
+  for (const mid of ids) { try { await jget(`/v1/mail/${encodeURIComponent(mid)}/context/verification`); } catch {} }
+  toast(`批量${action}完成 (${ids.length} 封)`, "ok");
+}
+
+/* Inbox 检查器 */
+$$("#ibTabs .insp-tab").forEach(b => b.addEventListener("click", () => {
+  $$("#ibTabs .insp-tab").forEach(x => x.classList.remove("active"));
+  b.classList.add("active"); S.ib.zone = b.dataset.zone; ibRenderZone();
+}));
+
+async function openMail(mailId) {
+  S.ib.current = mailId; S.ib.zone = "overview";
+  $$("#ibTabs .insp-tab").forEach((b,i) => b.classList.toggle("active", i === 0));
+  ibRender();
+  $("#inspectorBody").innerHTML = '<div class="muted" style="padding:30px;text-align:center">📡 拉 8 区上下文…</div>';
+  try {
+    const pairs = [
+      ["customer", `/v1/mail/${encodeURIComponent(mailId)}/context/customer`],
+      ["geometry", `/v1/mail/${encodeURIComponent(mailId)}/context/geometry`],
+      ["rag", `/v1/mail/${encodeURIComponent(mailId)}/context/rag`],
+      ["verification", `/v1/mail/${encodeURIComponent(mailId)}/context/verification`],
+      ["postmortem", `/v1/mail/${encodeURIComponent(mailId)}/context/postmortem`],
+      ["commercial", `/v1/mail/${encodeURIComponent(mailId)}/context/commercial`],
+      ["hitl", `/v1/mail/${encodeURIComponent(mailId)}/context/hitl`],
+    ];
+    const ctx = {};
+    await Promise.all(pairs.map(async ([k,u]) => { ctx[k] = await jget(u).catch(e => ({_error: e.message})); }));
+    S.ib.ctx = ctx;
+    updateGoldenChain(ctx.verification);
+    ibRenderZone();
+  } catch (e) { $("#inspectorBody").innerHTML = `<div class="err">拉上下文失败: ${esc(e.message)}</div>`; }
+}
+
+function updateGoldenChain(v) {
+  const status = (v && v.status) || "";
+  const map = { PASS:["INTAKE","PARSE","DFM","QUOTE","VERIFY"], HITL:["INTAKE","PARSE","DFM","QUOTE"], BLOCKED:["INTAKE","PARSE","DFM"], DONE:["INTAKE","PARSE","DFM","QUOTE","VERIFY","REPLY","CRM"] };
+  const done = map[status] || [];
+  $$("#goldenChain .gc-step").forEach(el => {
+    const step = el.dataset.step;
+    el.classList.remove("done","active");
+    if (done.includes(step)) el.classList.add("done");
+  });
+  $("#gcPhase").textContent = status || "idle";
+}
+
+function ibRenderZone() {
+  const c = S.ib.ctx; const zone = S.ib.zone;
+  if (!c) { $("#inspectorBody").innerHTML = '<div class="muted">无上下文</div>'; return; }
+  const v = c.verification||{}, cust = c.customer||{}, geo = c.geometry||{}, cm = c.commercial||{}, rag = c.rag||{}, hitl = c.hitl||{}, pm = c.postmortem||{};
+  const vCls = v.status === "PASS" ? "ok" : v.status === "HITL" ? "warn" : v.status === "BLOCKED" ? "err" : "";
+  const hist = cust.history || {};
+  const html = {
+    overview: `
+      <div class="inspector-zone"><h4>🛡 门禁 <span class="tag ${vCls}">${esc(v.status||"?")}</span></h4><div class="body">
+        <div class="kv"><span class="k">风险分</span><b>${v.risk_score ?? "—"}</b></div>
+        <div class="kv"><span class="k">升级原因</span>${(v.reasons||[]).map(esc).join("; ") || "无"}</div>
+      </div></div>
+      <div class="inspector-zone"><h4>👤 客户 <span class="tag">${cust.is_new?"新客":"老客"}</span></h4><div class="body">
+        <div class="kv"><span class="k">名称</span>${esc(cust.name||"—")}</div>
+        <div class="kv"><span class="k">客户ID</span><span class="mono">${esc(cust.customer_id||"—")}</span></div>
+      </div></div>
+      <div class="inspector-zone"><h4>📐 几何</h4><div class="body">
+        <div class="kv"><span class="k">bbox</span>${geo.bbox ? geo.bbox.join("×")+" mm" : "—"}</div>
+        <div class="kv"><span class="k">体积</span>${geo.volume_cm3 ?? "—"} cm³</div>
+        <div class="kv"><span class="k">质量</span>${geo.weight_kg ?? "—"} kg</div>
+      </div></div>
+      <div class="inspector-zone"><h4>💰 报价</h4><div class="body">
+        ${cm.ok ? `${esc(cm.currency||"CNY")} ${cm.unit_price} × qty = <b>${cm.final_price||cm.total_price||"—"}</b><br>毛利 ${cm.margin_pct ?? "—"}% · 运费 ${cm.freight_cny ?? "—"} · 关税 ${cm.duty_cny ?? "—"}` : (cm.reason || cm._error || "未报价")}</div></div>`,
+    customer: `
+      <div class="kv"><span class="k">客户名</span><b>${esc(cust.name||"—")}</b></div>
+      <div class="kv"><span class="k">客户ID</span><span class="mono">${esc(cust.customer_id||"—")}</span></div>
+      <div class="kv"><span class="k">是否新客</span>${cust.is_new?"是":"否"}</div>
+      <h4 style="margin:14px 12px 6px">信号</h4>
+      <div style="padding:0 12px">${(cust.signals||[]).map(s => `<div class="tag ${s.severity==="warning"?"warn":""}" style="display:block;margin-bottom:5px;text-align:left">${esc(s.type)}: ${esc(s.detail)}</div>`).join("") || "<div class='muted'>无</div>"}</div>
+      <h4 style="margin:14px 12px 6px">历史报价 (${(hist.quotes||[]).length})</h4>
+      <div style="padding:0 12px">${(hist.quotes||[]).slice(0,8).map(q => `<div style="padding:6px 0;border-bottom:1px solid var(--line)"><span class="mono">${esc(q.context_id||"")}</span> · ${fmtMoney(q.final_price||q.unit_price, q.currency)} · 毛利 ${q.margin_pct ?? "—"}%</div>`).join("") || "<div class='muted'>无</div>"}</div>`,
+    geometry: `
+      <div class="kv"><span class="k">bbox</span>${geo.bbox ? geo.bbox.join("×")+" mm" : "—"}</div>
+      <div class="kv"><span class="k">体积</span>${geo.volume_cm3 ?? "—"} cm³</div>
+      <div class="kv"><span class="k">质量</span>${geo.weight_kg ?? "—"} kg</div>
+      <div class="kv"><span class="k">特征</span>${geo.features ? JSON.stringify(geo.features).slice(0,200) : "—"}</div>
+      <div class="kv"><span class="k">来源</span><span class="mono">${esc(geo.source || geo._source || "—")}</span></div>
+      ${geo.error ? `<div class="err" style="margin:10px 12px">${esc(geo.error)}</div>` : ""}`,
+    rag: `
+      <div class="muted" style="padding:8px 12px">查询: <code>${esc((rag.query||"").slice(0,100))}</code> · 来源 ${esc(rag.source||rag._source||"—")}</div>
+      ${(rag.hits||[]).map(h => `<div class="rag-hit" style="margin:8px 12px"><div class="h"><b>${esc(h.title || h.case_id || h.doc_id || "命中")}</b><span class="score">${h.score!=null?Number(h.score).toFixed(3):""}</span></div><div class="muted" style="font-size:11px">${esc(h.snippet || "").slice(0,200)}</div></div>`).join("") || '<div class="muted" style="padding:20px;text-align:center">无 RAG 命中</div>'}`,
+    commercial: `
+      <div class="kv"><span class="k">货币</span>${esc(cm.currency||"CNY")}</div>
+      <div class="kv"><span class="k">单价</span><b>${fmtMoney(cm.unit_price, cm.currency)}</b></div>
+      <div class="kv"><span class="k">总价</span><b class="acc">${fmtMoney(cm.final_price||cm.total_price, cm.currency)}</b></div>
+      <div class="kv"><span class="k">毛利</span>${cm.margin_pct ?? "—"}%</div>
+      <div class="kv"><span class="k">运费</span>${fmtMoney(cm.freight_cny, "CNY")}</div>
+      <div class="kv"><span class="k">关税</span>${fmtMoney(cm.duty_cny, "CNY")}</div>
+      <div class="kv"><span class="k">落地成本</span>${fmtMoney(cm.landed_cost, "CNY")}</div>
+      <div class="kv"><span class="k">Incoterms</span>${esc(cm.incoterms||"—")}</div>`,
+    verification: `
+      <div class="kv"><span class="k">状态</span><span class="tag ${vCls}">${esc(v.status||"?")}</span></div>
+      <div class="kv"><span class="k">风险分</span><b class="${v.status==="BLOCKED"?"err":""}">${v.risk_score ?? "—"}</b></div>
+      <h4 style="margin:14px 12px 6px">升级原因</h4>
+      <div style="padding:0 12px">${(v.reasons||[]).map(r => `<div style="padding:4px 0">· ${esc(r)}</div>`).join("") || "<div class='muted'>无</div>"}</div>
+      <h4 style="margin:14px 12px 6px">冲突检测</h4>
+      <div style="padding:0 12px">${(v.conflicts||[]).map(c => `<div class="tag err" style="display:block;margin-bottom:5px;text-align:left">${esc(typeof c === "string" ? c : JSON.stringify(c))}</div>`).join("") || "<div class='muted'>无冲突</div>"}</div>`,
+    hitl: `
+      <div class="kv"><span class="k">可批准</span><span class="tag ${hitl.can_approve?"ok":"err"}">${hitl.can_approve?"✓ 可以":"✗ 不可"}</span></div>
+      <div class="kv"><span class="k">门禁状态</span>${esc(hitl.verification_status||"—")}</div>
+      <div class="kv"><span class="k">报价锁</span><span class="mono ${hitl.locked?"":"err"}">${hitl.locked?"🔒 已锁":"⚠ 锁破"}</span></div>
+      <div class="kv"><span class="k">sha16</span><span class="mono">${esc(hitl.quote_sha16_locked||"—")}</span></div>
+      ${hitl.draft ? `<h4 style="margin:14px 12px 6px">📝 回复草稿</h4><pre style="margin:0 12px 14px;padding:10px;background:var(--bg);border:1px solid var(--line);border-radius:4px;font-size:11px;white-space:pre-wrap;max-height:300px;overflow:auto">${esc((hitl.draft.body||hitl.draft.subject||"").slice(0,1500))}</pre>` : '<div class="muted" style="padding:20px;text-align:center">无草稿</div>'}
+      ${hitl.can_approve ? `<div style="padding:0 12px 14px"><button class="btn primary" onclick="approveMail('${esc(S.ib.current||"")}')">✓ 批准并回复 (HITL)</button></div>` : ""}`,
+  };
+  $("#inspectorBody").innerHTML = html[zone] || html.overview;
+}
+
+async function approveMail(mailId) {
+  if (!mailId) return;
+  try {
+    const cid = S.ib.ctx && S.ib.ctx.hitl && S.ib.ctx.hitl.context_id;
+    if (!cid) { toast("无 context_id, 无法批准", "err"); return; }
+    await jpost(`/v1/rfq/${encodeURIComponent(cid)}/approve`, null, true);
+    toast("已批准, 草稿进入 REPLY", "ok");
+    openMail(mailId);
+  } catch (e) { toast("批准失败: " + e.message, "err"); }
+}
+
+/* ========== ORDERS (对接 /v1/orders — orders_api.py) ========== */
+const STATUS_ZH = {inquiry:"询盘",quote:"报价",sample:"样品",batch:"批量",shipped:"发货",closed:"完结",lost:"丢单"};
+const STATUS_CLS = {inquiry:"mut",quote:"acc",sample:"blue",batch:"acc",shipped:"ok",closed:"ok",lost:"err"};
+const odDebounced = debounce(() => odLoad(1), 350);
+async function odLoad(page) {
+  S.od.page = Math.max(1, page || 1);
+  const size = parseInt($("#odPageSize").value || "20");
+  S.od.pageSize = size;
+  const q = $("#odSearch").value.trim();
+  const status = $("#odState").value;
+  const sort = $("#odSort").value;
+  const params = new URLSearchParams({ page: S.od.page, size, sort });
+  if (q) params.set("q", q);
+  if (status) params.set("status", status);
+  $("#ordersBody").innerHTML = '<tr><td colspan="11" style="padding:30px;text-align:center" class="muted">加载中…</td></tr>';
+  try {
+    const d = await jget("/v1/orders?" + params.toString());
+    S.od.rows = d.items || []; S.od.total = d.total || 0; S.od.pages = d.pages || 1;
+    if (d.status_zh) Object.assign(STATUS_ZH, d.status_zh);
+    odRender();
+  } catch (e) {
+    $("#ordersBody").innerHTML = `<tr><td colspan="11" class="err" style="padding:20px">/v1/orders 失败: ${esc(e.message)}</td></tr>`;
+  }
+}
+function odRender() {
+  const rows = S.od.rows;
+  if (!rows.length) {
+    $("#ordersBody").innerHTML = '<tr><td colspan="11"><div class="empty-illus"><span class="ico">📦</span>无订单<small>调整筛选或先创建订单</small></div></td></tr>';
+  } else {
+    $("#ordersBody").innerHTML = rows.map(o => {
+      const checked = S.od.sel.has(o.id) ? "checked" : "";
+      const sCls = STATUS_CLS[o.status] || "mut";
+      return `<tr>
+        <td class="ck"><input type="checkbox" ${checked} onchange="odToggle('${esc(o.id)}', this.checked)" /></td>
+        <td><span class="mono">${esc(o.id||"")}</span></td>
+        <td>${esc(o.customer_name||o.customer_id||"—")}</td>
+        <td class="truncate" title="${esc(o.title||"")}">${esc(o.title||"—")} ${o.context_id?`<span class="sk-id">${esc(o.context_id.slice(0,16))}</span>`:""}</td>
+        <td class="num">${o.quantity ?? "—"}</td>
+        <td class="num"><b>${o.amount_usd!=null?Number(o.amount_usd).toLocaleString():"—"}</b></td>
+        <td>${esc(o.currency||"USD")}</td>
+        <td><span class="tag ${sCls}">${esc(STATUS_ZH[o.status]||o.status||"—")}</span></td>
+        <td><span class="muted" style="font-size:11px">${esc(o.source||"—")}</span></td>
+        <td><span class="muted" style="font-size:11px">${fmtTime(o.created_at)}</span></td>
+      </tr>`;
+    }).join("");
+  }
+  $("#odPageInfo").textContent = `第 ${S.od.page}/${S.od.pages||1} 页 · 共 ${S.od.total} 条`;
+  $("#odPager").textContent = S.od.page;
+  $("#odSelectAll").checked = S.od.rows.length > 0 && S.od.rows.every(r => S.od.sel.has(r.id));
+  $("#odSelCount").textContent = `已选 ${S.od.sel.size}`;
+}
+function odToggle(id, on) { on ? S.od.sel.add(id) : S.od.sel.delete(id); odRender(); }
+function odToggleAll(on) { S.od.rows.forEach(r => on ? S.od.sel.add(r.id) : S.od.sel.delete(r.id)); odRender(); }
+function odPrev() { if (S.od.page > 1) odLoad(S.od.page - 1); }
+function odNext() { if (S.od.page < S.od.pages) odLoad(S.od.page + 1); }
+async function odBatchTransition() {
+  const ids = Array.from(S.od.sel);
+  if (!ids.length) { toast("请先勾选订单", "err"); return; }
+  const target = $("#odBatchStatus").value;
+  try {
+    const r = await jpost("/v1/orders/bulk", { ids, action: "transition", target_status: target });
+    const okCnt = (r.ok||[]).length;
+    toast(`批量流转→${STATUS_ZH[target]||target}: 成功 ${okCnt}/${ids.length}`, okCnt?"ok":"err");
+    S.od.sel.clear(); odLoad(S.od.page);
+  } catch (e) { toast("批量流转失败: " + e.message, "err"); }
+}
+async function odBatchDelete() {
+  const ids = Array.from(S.od.sel);
+  if (!ids.length) { toast("请先勾选订单", "err"); return; }
+  if (!confirm(`确认删除 ${ids.length} 个订单?`)) return;
+  try {
+    const r = await jpost("/v1/orders/bulk", { ids, action: "delete" });
+    toast(`删除 ${r.ok.length}/${ids.length}`, "ok");
+    S.od.sel.clear(); odLoad(S.od.page);
+  } catch (e) { toast("删除失败: " + e.message, "err"); }
+}
+function odExport() {
+  const rows = S.od.rows; if (!rows.length) { toast("无数据可导出", "err"); return; }
+  const head = ["id","customer_id","customer_name","title","status","quantity","amount_usd","currency","context_id","source","created_at"];
+  const csv = [head.join(",")].concat(rows.map(r => head.map(h => `"${String(r[h] ?? "").replace(/"/g,'""')}"`).join(","))).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = `orders_${Date.now()}.csv`; a.click();
+  toast("已导出 CSV", "ok");
+}
+
+/* ========== DRAWINGS ========== */
+function setupDrop(zoneId, fileInputId, handler) {
+  const dz = $(zoneId);
+  ["dragenter","dragover"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("drag"); }));
+  ["dragleave","drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("drag"); }));
+  dz.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) handler(f); });
+}
+setupDrop("#dropZone", "#stepFile", uploadStep);
+
+async function uploadStep(file) {
+  if (!file) return;
+  $("#uploadProgress").innerHTML = '<div class="muted" style="font-size:12px">⏳ 上传 + 解析几何…</div>';
+  $("#stepPreview").innerHTML = "";
+  const fd = new FormData(); fd.append("file", file);
+  try {
+    const r = await jpost("/v1/upload/step-with-thumbnail", fd, true);
+    $("#uploadProgress").innerHTML = `<div class="tag ok" style="display:inline-block">✓ 解析完成 · ${r.cached?"缓存":"新算"} · ${esc(r._source||"")}</div>`;
+    $("#stepPreview").innerHTML = `
+      <div class="kv"><span class="k">文件</span>${esc(file.name)}</div>
+      <div class="kv"><span class="k">bbox</span>${r.bbox ? r.bbox.join("×")+" mm" : "—"}</div>
+      <div class="kv"><span class="k">体积</span>${r.volume_cm3 ?? "—"} cm³</div>
+      <div class="kv"><span class="k">质量</span>${r.mass_g ?? "—"} g</div>
+      <div class="kv"><span class="k">特征</span>${r.features_count ?? "—"}</div>
+      <div class="kv"><span class="k">sha16</span><span class="mono">${esc(r.sha256_16||"—")}</span></div>
+      <div style="margin-top:10px">${r.svg || ""}</div>`;
+    $("#dwSearch").value = (file.name.split(".")[0] + " " + (r.bbox||[]).join(" ")).trim();
+  } catch (e) {
+    $("#uploadProgress").innerHTML = `<div class="err">上传失败: ${esc(e.message)}</div>`;
+  }
+}
+
+async function dwSearch() {
+  const q = $("#dwSearch").value.trim();
+  const scope = $("#dwScope").value;
+  if (!q) { $("#dwResults").innerHTML = '<div class="muted">请输入关键词</div>'; return; }
+  $("#dwResults").innerHTML = '<div class="muted">⏳ 检索中…</div>';
+  const parts = [];
+  if (scope === "rag" || scope === "both") {
+    try {
+      const r = await jget("/v1/rag/search?q=" + encodeURIComponent(q) + "&limit=5");
+      parts.push('<h4 style="margin:0 0 8px;color:var(--ink)">📚 本地 RAG 命中</h4>');
+      parts.push((r.hits||[]).map(h => `<div class="rag-hit"><div class="h"><b>${esc(h.doc_name||h.title||"命中")}</b><span class="score">${h.score!=null?Number(h.score).toFixed(3):""}</span></div><div class="muted" style="font-size:11px">${esc((h.snippet||h.text||"").slice(0,240))}</div></div>`).join("") || '<div class="muted">无 RAG 命中</div>');
+    } catch (e) { parts.push(`<div class="err">RAG 失败: ${esc(e.message)}</div>`); }
+  }
+  if (scope === "web" || scope === "both") {
+    try {
+      const w = await jget("/v1/web/search?q=" + encodeURIComponent(q) + "&num=5");
+      parts.push('<h4 style="margin:14px 0 8px;color:var(--ink)">🌐 联网搜索</h4>');
+      if (w.warning) parts.push(`<div class="tag warn">${esc(w.warning)}</div>`);
+      parts.push((w.hits||[]).map(h => `<div class="web-hit"><div class="h"><a href="${esc(h.url)}" target="_blank">${esc(h.title||h.url)}</a><span class="mono muted" style="font-size:10px">${esc(h.engine||"")}</span></div><div class="muted" style="font-size:11px">${esc((h.snippet||"").slice(0,200))}</div></div>`).join("") || '<div class="muted">无联网结果</div>');
+    } catch (e) { parts.push(`<div class="err">联网失败: ${esc(e.message)}</div>`); }
+  }
+  $("#dwResults").innerHTML = parts.join("") || '<div class="muted">无结果</div>';
+}
+
+/* ========== RAG ========== */
+setupDrop("#ragDrop", "#ragFile", ragIngest);
+
+async function ragIngest(file) {
+  if (!file) return;
+  $("#ragIngestStatus").innerHTML = '<div class="muted" style="font-size:12px">⏳ 入库 + 向量化…</div>';
+  const fd = new FormData(); fd.append("file", file);
+  if ($("#ragCid").value) fd.append("customer_id", $("#ragCid").value);
+  if ($("#ragTags").value) fd.append("tags", $("#ragTags").value);
+  try {
+    const r = await jpost("/v1/rag/ingest", fd, true);
+    $("#ragIngestStatus").innerHTML = `<div class="tag ok">✓ 已入库 · ${esc(r.doc_id||r.filename||file.name)} · ${esc(r.embed_source||"")}</div>`;
+    ragLoadDocs();
+  } catch (e) { $("#ragIngestStatus").innerHTML = `<div class="err">入库失败: ${esc(e.message)}</div>`; }
+}
+
+async function ragSearch() {
+  const q = $("#ragQuery").value.trim();
+  if (!q) { $("#ragSearchResult").innerHTML = '<div class="muted">请输入问题</div>'; return; }
+  $("#ragSearchResult").innerHTML = '<div class="muted">⏳ 检索…</div>';
+  try {
+    const r = await jget("/v1/rag/search?q=" + encodeURIComponent(q) + "&limit=8");
+    $("#ragSearchResult").innerHTML = (r.hits||[]).map(h => `<div class="rag-hit"><div class="h"><b>${esc(h.doc_name||h.title||"命中")}</b><span class="score">${h.score!=null?Number(h.score).toFixed(3):""}</span></div><div class="muted" style="font-size:11px">${esc((h.snippet||h.text||"").slice(0,280))}</div></div>`).join("") || '<div class="muted">无命中 · embed_source: ' + esc(r.embed_source||"") + '</div>';
+  } catch (e) { $("#ragSearchResult").innerHTML = `<div class="err">检索失败: ${esc(e.message)}</div>`; }
+}
+
+async function ragWebSearch() {
+  const q = $("#ragQuery").value.trim();
+  if (!q) { $("#ragSearchResult").innerHTML = '<div class="muted">请输入问题</div>'; return; }
+  $("#ragSearchResult").innerHTML = '<div class="muted">⏳ 联网…</div>';
+  try {
+    const w = await jget("/v1/web/search?q=" + encodeURIComponent(q) + "&num=6");
+    if (w.warning) { $("#ragSearchResult").innerHTML = `<div class="tag warn">${esc(w.warning)}</div>`; return; }
+    $("#ragSearchResult").innerHTML = (w.hits||[]).map(h => `<div class="web-hit"><div class="h"><a href="${esc(h.url)}" target="_blank">${esc(h.title||h.url)}</a><span class="mono muted" style="font-size:10px">${esc(h.engine||"")}</span></div><div class="muted" style="font-size:11px">${esc((h.snippet||"").slice(0,220))}</div></div>`).join("") || '<div class="muted">无结果</div>';
+  } catch (e) { $("#ragSearchResult").innerHTML = `<div class="err">联网失败: ${esc(e.message)}</div>`; }
+}
+
+async function ragLoadDocs() {
+  try {
+    const d = await jget("/v1/rag/docs");
+    S.ragDocs = d.docs || [];
+    $("#ragDocCount").textContent = `(${d.count || 0})`;
+    ragFilterDocs();
+  } catch (e) { $("#ragDocsList").innerHTML = `<div class="err">加载失败: ${esc(e.message)}</div>`; }
+}
+function ragFilterDocs() {
+  const q = ($("#ragDocFilter").value || "").trim().toLowerCase();
+  const docs = S.ragDocs.filter(d => !q || JSON.stringify(d).toLowerCase().includes(q));
+  $("#ragDocsList").innerHTML = docs.map(d => `<div class="sk-item" style="cursor:default">
+    <div class="sk-ico">📄</div>
+    <div class="sk-body"><div class="sk-name">${esc(d.doc_name||d.doc_id||"")} <span class="sk-id">${esc((d.doc_id||"").slice(0,16))}</span></div>
+      <div class="sk-desc">${esc(d.customer_id||"")} · ${esc((d.tags||[]).join(","))} · ${fmtTime(d.created_at_epoch || d.mtime)}</div></div>
+    <div class="sk-meta"><button class="btn danger" style="padding:3px 8px;font-size:10px" onclick="ragDelete('${esc(d.doc_id)}')">删除</button></div>
+  </div>`).join("") || '<div class="empty-illus"><span class="ico">📚</span>空文档库<small>拖拽文件入库</small></div>';
+}
+async function ragDelete(docId) {
+  if (!confirm("删除文档 " + docId + "?")) return;
+  try { await fetch("/v1/rag/docs/" + encodeURIComponent(docId), { method: "DELETE" }); toast("已删除", "ok"); ragLoadDocs(); }
+  catch (e) { toast("删除失败: " + e.message, "err"); }
+}
+
+/* ========== MODELS ========== */
+async function loadModels() {
+  try {
+    const mc = await jget("/v1/models/config");
+    S.models = mc;
+    const cfg = mc.config || {}; const models = cfg.models || {}; const probe = mc.probe || {};
+    const order = ["llm","vlm","embedding","ocr","asr","deterministic"];
+    $("#modelsList").innerHTML = order.filter(k => models[k]).map(k => {
+      const m = models[k] || {}; const p = probe[k] || {};
+      const locked = m.locked; const enabled = m.enabled !== false;
+      const role = m.role || k;
+      return `<div class="field-row">
+        <div><b>${esc(m.label||k)}</b><br><span class="badge-role">${esc(role)}</span> ${locked?'<span class="tag acc" style="font-size:9px">🔒 锁定</span>':''}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <input type="text" data-k="${k}" data-f="endpoint" value="${esc(m.endpoint||"")}" placeholder="endpoint" ${locked?"disabled":""} />
+          <input type="text" data-k="${k}" data-f="model" value="${esc(m.model||"")}" placeholder="model" ${locked?"disabled":""} />
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:end;gap:6px">
+          <label class="switch"><input type="checkbox" data-k="${k}" data-f="enabled" ${enabled?"checked":""} ${locked?"disabled":""} /><span class="slider"></span></label>
+          <span class="mono ${p.online?"ok":"err"}" style="font-size:10px">${p.online?(p.latency_ms!=null?p.latency_ms+"ms":"online"):"offline"}</span>
+          <button class="btn" style="padding:2px 8px;font-size:10px" onclick="modelsProbeOne('${k}')">探活</button>
+        </div>
+      </div>`;
+    }).join("");
+  } catch (e) { $("#modelsList").innerHTML = `<div class="err">加载失败: ${esc(e.message)}</div>`; }
+}
+async function modelsSave() {
+  const cfg = S.models.config || {};
+  $$("#modelsList [data-k]").forEach(el => {
+    const k = el.dataset.k, f = el.dataset.f;
+    if (!cfg.models[k]) cfg.models[k] = {};
+    if (el.type === "checkbox") cfg.models[k][f] = el.checked;
+    else cfg.models[k][f] = el.value;
+  });
+  $("#modelsSaveHint").textContent = "保存中…";
+  try {
+    const r = await jpost("/v1/models/config", cfg);
+    $("#modelsSaveHint").textContent = "✓ 已保存 + 探活完成";
+    toast("模型配置已保存", "ok");
+    S.models = r; loadModels();
+  } catch (e) { $("#modelsSaveHint").innerHTML = `<span class="err">失败: ${esc(e.message)}</span>`; toast("保存失败: " + e.message, "err"); }
+}
+async function modelsProbe() { $("#modelsSaveHint").textContent = "探活中…"; try { await modelsSave(); } catch {} }
+async function modelsProbeOne(k) {
+  try {
+    const r = await jpost("/v1/models/probe?key=" + encodeURIComponent(k), {});
+    const p = r[k] || {};
+    toast(`${k}: ${p.online?"在线 "+(p.latency_ms||"")+"ms":"离线"}`, p.online?"ok":"err");
+    loadModels();
+  } catch (e) { toast("探活失败: " + e.message, "err"); }
+}
+
+/* ========== STATUS ========== */
+async function loadStatus() {
+  try {
+    const h = await jget("/health");
+    $("#stHealth").innerHTML = `<div class="kv"><span class="k">服务</span>${esc(h.service||"—")}</div>
+      <div class="kv"><span class="k">版本</span><span class="mono">${esc(h.version||"—")}</span></div>
+      <div class="kv"><span class="k">引擎</span>${esc(h.engine||"—")}</div>
+      <div class="kv"><span class="k">多模态</span>${esc(h.multimodal||"—")}</div>
+      <div class="kv"><span class="k">上下文数</span>${h.contexts ?? "—"}</div>`;
+  } catch (e) { $("#stHealth").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  try {
+    const c = await jget("/v1/cache/stats");
+    $("#stCache").innerHTML = `<div class="kv"><span class="k">容量</span>${c.size}/${c.max_size}</div>
+      <div class="kv"><span class="k">命中率</span><b>${((c.hit_rate||0)*100).toFixed(1)}%</b></div>
+      <div class="kv"><span class="k">命中</span>${c.hits ?? "—"}</div>
+      <div class="kv"><span class="k">未命中</span>${c.misses ?? "—"}</div>
+      <button class="btn" style="margin-top:8px" onclick="cacheInvalidate()">失效全部缓存</button>`;
+  } catch (e) { $("#stCache").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  try {
+    const cs = await jget("/v1/config/status");
+    $("#stConfig").innerHTML = Object.entries(cs).map(([k,v]) => `<div class="kv"><span class="k">${k}</span>${v.loaded?"✓ 已载":"✗"} · 重载 ${v.reload_count||0} ${v.last_error?`<span class="err">${esc(v.last_error)}</span>`:""}</div>`).join("") +
+      `<button class="btn" style="margin-top:8px" onclick="configReload()">⟳ 热载重读</button>`;
+  } catch (e) { $("#stConfig").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  try {
+    const mp = await jget("/v1/mail/puller/status");
+    $("#stMailPuller").innerHTML = `<div class="kv"><span class="k">自动启动</span>${mp.autostart_enabled?"是":"否"}</div>
+      <div class="kv"><span class="k">运行中</span>${mp.running?"✓ 是":"✗ 否"}</div>
+      <div class="kv"><span class="k">puller</span>${mp.puller?`enabled=${mp.puller.enabled} · pending=${mp.puller.pending_count||0}`:"—"}</div>`;
+  } catch (e) { $("#stMailPuller").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+async function loadTraces() {
+  $("#stTraces").innerHTML = '<div class="muted">加载最近 trace…</div>';
+  try {
+    const cid = S.ib.current || "";
+    const t = await jget("/v1/traces/" + encodeURIComponent(cid || "latest"));
+    const evs = t.events || t.spans || [];
+    $("#stTraces").innerHTML = evs.slice(-30).map(e => `<div style="padding:4px 0;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:10.5px"><span class="muted">${esc(e.timestamp||e.ts||"")}</span> <b>${esc(e.skill||e.name||e.action||"")}</b> ${esc(JSON.stringify(e.args||e.attrs||{}).slice(0,120))}</div>`).join("") || '<div class="muted">无 trace</div>';
+  } catch (e) { $("#stTraces").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+async function cacheInvalidate() { try { await jpost("/v1/cache/invalidate"); toast("缓存已失效", "ok"); loadStatus(); } catch (e) { toast(e.message, "err"); } }
+async function configReload() { try { await jpost("/v1/config/reload"); toast("配置已热载", "ok"); loadStatus(); } catch (e) { toast(e.message, "err"); } }
+
+/* ========== AGENT CHAT ========== */
+function agentAdd(role, text) {
+  const div = document.createElement("div");
+  div.className = "msg " + (role === "user" ? "user" : role === "err" ? "" : "agent");
+  div.innerHTML = `<div class="who">${role === "user" ? "你" : role === "err" ? "✗" : "🤖 Agent"}</div><div class="bubble">${esc(text)}</div>`;
+  $("#chatThread").appendChild(div);
+  $("#chatThread").scrollTop = $("#chatThread").scrollHeight;
+}
+function agentQuick(text) { $("#chatTa").value = text; agentSend(); }
+async function agentSend() {
+  const ta = $("#chatTa"); const text = ta.value.trim(); if (!text) return; ta.value = "";
+  agentAdd("user", text);
+  const t = text.toLowerCase();
+  const cid = S.ib.current || "";
+  try {
+    if (t.includes("报价") || t.includes("quote")) {
+      agentAdd("agent", "已触发 calc_quote (确定性铁律① · 不走 LLM)。" + (cid ? ` 上下文 ${cid}` : " 请先在询盘邮件中选一封。"));
+    } else if (t.includes("门禁") || t.includes("verify")) {
+      if (cid) { const v = await jget(`/v1/mail/${encodeURIComponent(cid)}/context/verification`); agentAdd("agent", `门禁: ${v.status} · 风险 ${v.risk_score} · ${(v.reasons||[]).join("; ")}`); updateGoldenChain(v); }
+      else agentAdd("agent", "请先选一封邮件再跑门禁。");
+    } else if (t.includes("起草") || t.includes("回复") || t.includes("draft")) {
+      if (cid) { const h = await jget(`/v1/mail/${encodeURIComponent(cid)}/context/hitl`); agentAdd("agent", `草稿生成 · 可批准=${h.can_approve} · 锁=${h.locked?"完整":"破"}`); }
+      else agentAdd("agent", "请先选一封邮件再起草。");
+    } else if (t.includes("客户") || t.includes("历史")) {
+      if (cid) { const c = await jget(`/v1/mail/${encodeURIComponent(cid)}/context/customer`); agentAdd("agent", `客户 ${c.name} (${c.is_new?"新":"老"}) · 信号 ${c.signals.length} · 历史报价 ${(c.history.quotes||[]).length}`); }
+      else agentAdd("agent", "请先选邮件查客户。");
+    } else if (t.includes("联网") || t.includes("尽调")) {
+      const w = await jget("/v1/web/search?q=" + encodeURIComponent(text) + "&num=3");
+      if (w.warning) agentAdd("agent", "联网: " + w.warning);
+      else agentAdd("agent", "联网命中 " + (w.hits||[]).length + " 条:\n" + (w.hits||[]).map(h => "· " + h.title).join("\n"));
+    } else {
+      agentAdd("agent", "可试: 算报价 / 跑门禁 / 起草回复 / 查客户 / 联网尽调");
+    }
+  } catch (e) { agentAdd("err", e.message); }
+}
+$("#chatTa").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); agentSend(); } });
+
+/* ========== 启动 ========== */
+loadHealth();
+loadDashboard();
+</script>
+</body>
+</html>

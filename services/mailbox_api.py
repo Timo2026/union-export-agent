@@ -1,0 +1,518 @@
+"""mailbox_api.py — v3.0 #34 邮件台 7 区聚合 API.
+
+实现 (凭代码核对，全部复用现有函数，不发明):
+  GET  /v1/mail/inbox                      → 列出 data/mailbox/*.eml
+  GET  /v1/mail/{mail_id}                  → 单信详情 (raw + parsed + 附件)
+  GET  /v1/mail/{mail_id}/context/customer       → B-1 客户区
+  GET  /v1/mail/{mail_id}/context/geometry       → B-2 图纸区
+  GET  /v1/mail/{mail_id}/context/rag            → B-3 RAG 区
+  GET  /v1/mail/{mail_id}/context/image          → B-3' 图片区 (T5: 附件图片 VLM 感知)
+  GET  /v1/mail/{mail_id}/context/pending        → B-4 未办区
+  GET  /v1/mail/{mail_id}/context/verification   → B-5 门禁区
+  GET  /v1/mail/{mail_id}/context/postmortem     → B-6 复盘区
+  GET  /v1/mail/{mail_id}/context/commercial     → B-7 落地成本区
+  GET  /v1/mail/{mail_id}/context/trace          → B-8 Trace 区 (optional)
+
+mail_id 格式: <sha256_16>_<timestamp> (来自 data/mailbox 文件名 stem)
+或直接传文件名 stem.
+
+数据来源全部走 controller.* 现有函数, 0 发明.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
+
+from services import file_intake as fi
+from services import commercial as commercial_mod
+from services.crm_memory import CRMMemory
+
+_MAILBOX_DIR = Path("data/mailbox")
+_DRAFTS_DIR = Path("data/drafts")
+_CONTEXTS_DIR = Path("data/contexts")
+_TRACES_DIR = Path("data/traces")
+
+# pending ledger 终态 (与 orchestrator 的 mark_read_on_terminal 策略同源):
+# DONE/BLOCKED/FAILED/DEAD/SKIPPED 会标 IMAP \Seen — inbox 未读判定用它兜底。
+# HITL 故意不在内: 等人工 send-reply, 期间保持未读 (用户 2026-09-24 拍板)。
+_TERMINAL_STATES = {"DONE", "BLOCKED", "FAILED", "DEAD", "SKIPPED"}
+
+
+def _sha16(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def _mailbox_path(mail_id: str) -> Path:
+    """mail_id → data/mailbox/{mail_id}.eml (兼容 _<ts> 后缀)."""
+    # 先直接匹配
+    p = _MAILBOX_DIR / f"{mail_id}.eml"
+    if p.exists():
+        return p
+    # 兼容 stem (去掉 .eml 后再传进来的情况)
+    for cand in _MAILBOX_DIR.glob(f"{mail_id}*.eml"):
+        return cand
+    raise HTTPException(404, f"mail not found: {mail_id}")
+
+
+def _parse_mail(mail_id: str) -> Dict[str, Any]:
+    path = _mailbox_path(mail_id)
+    parsed = fi.parse_email_file(str(path))
+    parsed["mail_id"] = mail_id
+    parsed["path"] = str(path)
+    parsed["size_bytes"] = path.stat().st_size
+    parsed["received_at"] = path.stat().st_mtime
+    # 列出附件
+    attachments = parsed.get("attachments") or []
+    parsed["attachments_detail"] = []
+    for name in attachments:
+        if not name:
+            continue
+        ext = Path(name).suffix.lower()
+        kind = fi.classify(name)
+        parsed["attachments_detail"].append({
+            "name": name, "ext": ext, "kind": kind,
+            "preview_path": str(_MAILBOX_DIR / f"{mail_id}_att_{name}") if False else None,
+        })
+    return parsed
+
+
+def _context_id_for(mail_id: str) -> Optional[str]:
+    """从 mail_id 反查 context_id: 优先 meta.json, 缺失则回落 pending 台账 (真实处理链路绑定)."""
+    meta = _MAILBOX_DIR / f"{mail_id}.meta.json"
+    if meta.exists():
+        try:
+            cid = json.loads(meta.read_text(encoding="utf-8")).get("context_id")
+            if cid:
+                return cid
+        except Exception:
+            pass
+    try:
+        from services.mail_puller import MailPuller
+        rec = MailPuller(root=Path(".")).pending_index().get(mail_id) or {}
+        if rec.get("context_id"):
+            return rec["context_id"]
+    except Exception:
+        pass
+    return None
+
+
+def _aggregate_status(pend: Optional[Dict[str, Any]],
+                      filt: Any) -> str:
+    """顶层 status 聚合 (BUG-4): pending 台账 → 分类 filter → 默认 NEW。
+
+    前端状态列不再依赖 `pending.state` 单点兜底 (已过滤邮件 pending 被清后
+    显示空)。台账优先 (reprocess 覆写以台账为准); 无台账时按分类层 meta.filter
+    推导: skip → SKIPPED (非询价等同终态过滤), gray → GRAY (灰区待复核),
+    rfq/无分类 → NEW (未处理)。
+    """
+    state = (pend or {}).get("state")
+    if state:
+        return state
+    kind = filt.get("kind") if isinstance(filt, dict) else None
+    if kind == "skip":
+        return "SKIPPED"
+    if kind == "gray":
+        return "GRAY"
+    return "NEW"
+
+
+# ---------------- 路由注册 ----------------
+router = APIRouter()
+
+
+@router.get("/v1/mail/inbox")
+def mail_inbox(limit: int = 50) -> Dict[str, Any]:
+    """列出本地 mailbox 中所有 .eml (按 mtime DESC).
+
+    P0 标记 (方案 D): 每项附带 pending ledger 摘要 (state + driver + attempts),
+    控制台据此渲染"Agent 处理 / 邮件驱动 / 待人工"徽标; 不在 ledger 的邮件
+    (mock 上传 / 历史预置) pending=None.
+
+    2026-09-24 过滤层: 附带 is_unread (IMAP \Seen 或终态 → 已读),
+    read_at (meta.imap_read_at) 与 filter (分类判定: rfq/skip/gray) —
+    与 webui-redesign Mailbox 视图的"已过滤/待复核/未读"筛选对应。
+    """
+    _MAILBOX_DIR.mkdir(parents=True, exist_ok=True)
+    from services.mail_puller import MailPuller
+    try:
+        pending_index = MailPuller(root=Path(".")).pending_index()
+    except Exception:
+        pending_index = {}
+    items: List[Dict[str, Any]] = []
+    for p in sorted(_MAILBOX_DIR.glob("*.eml"), key=lambda x: x.stat().st_mtime, reverse=True)[:limit]:
+        stem = p.stem
+        parsed = fi.parse_email_file(str(p))
+        meta_path = _MAILBOX_DIR / f"{stem}.meta.json"
+        badges = []
+        meta: Dict[str, Any] = {}
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                badges = meta.get("badges", [])
+            except Exception:
+                pass
+        pend = pending_index.get(stem)
+        # 已读判定: IMAP \Seen 标记 (imap_read_at) 或 pending 终态 — 二者居一即已读
+        read_at = meta.get("imap_read_at")
+        is_unread = not read_at and (pend or {}).get("state") not in _TERMINAL_STATES
+        items.append({
+            "mail_id": stem,
+            "from": parsed.get("from", ""),
+            "subject": parsed.get("subject", ""),
+            "received_at": p.stat().st_mtime,
+            "size_bytes": p.stat().st_size,
+            "badges": badges,
+            "pending": pend,
+            "attachments_count": len(parsed.get("attachments") or []),
+            "is_unread": is_unread,
+            "read_at": read_at,
+            "filter": meta.get("filter"),
+            "status": _aggregate_status(pend, meta.get("filter")),
+        })
+    return {"items": items, "count": len(items), "source": "local"}
+
+
+@router.get("/v1/mail/{mail_id}/context/customer")
+def mail_context_customer(mail_id: str) -> Dict[str, Any]:
+    """B-1 客户区: from 字段 → crm.customer_id_by_name → list_customer_history."""
+    from bootstrap import build_controller
+    c = build_controller()
+    parsed = _parse_mail(mail_id)
+    sender = parsed.get("from", "") or ""
+    # 抽取邮箱 local part 作为客户名兜底
+    name = sender.split("<")[0].strip() or sender
+    cid = c.crm.customer_id_by_name(name) if name else None
+    if not cid:
+        return {"name": name, "customer_id": None, "is_new": True,
+                "signals": [], "history": {"quotes": [], "postmortems": [], "n": 0}}
+    hist = c.crm.list_customer_history(cid)
+    # signals 由 postmortem.recall_customer_memory 给 (从 history 推导简化版)
+    signals = []
+    if hist.get("quotes"):
+        signals.append({"type": "repeat_customer", "severity": "info",
+                        "detail": f"历史 {len(hist['quotes'])} 条报价"})
+        margins = [q.get("margin_pct") for q in hist["quotes"] if q.get("margin_pct") is not None]
+        if margins:
+            avg_m = round(sum(margins) / len(margins), 1)
+            signals.append({"type": "historical_margin", "severity": "info",
+                            "detail": f"历史平均毛利 {avg_m}%"})
+    lost = [p for p in hist.get("postmortems", []) if p.get("outcome") == "lost"]
+    if lost:
+        signals.append({"type": "past_loss", "severity": "warning",
+                        "detail": f"{len(lost)} 次丢单"})
+    return {"name": name, "customer_id": cid, "is_new": False,
+            "signals": signals, "history": hist}
+
+
+@router.get("/v1/mail/{mail_id}/context/geometry")
+def mail_context_geometry(mail_id: str) -> Dict[str, Any]:
+    """B-2 图纸区: 附件 .step → parse_step (bbox/volume/weight/features)."""
+    from bootstrap import build_controller
+    c = build_controller()
+    parsed = _parse_mail(mail_id)
+    for att in parsed.get("attachments_detail", []):
+        if att["kind"] == "step":
+            # 附件路径推断: data/artifacts/step/<ts>_<hash>_<safe>
+            # demo 文件直接落在 mailbox 旁
+            cand = _MAILBOX_DIR / f"{mail_id}_att_{att['name']}"
+            if cand.exists():
+                try:
+                    geo = c.timo.step_geometry(str(cand), material="6061")
+                    # v7.0: 缩略图按内容 sha 命中缓存则给出真实 URL (只读缓存, 不冒充)
+                    thumb_url = None
+                    try:
+                        import hashlib as _hl
+                        sha16 = _hl.sha256(cand.read_bytes()).hexdigest()[:16]
+                        if (_MAILBOX_DIR.parent / "thumbnails" / f"{sha16}.svg").exists():
+                            thumb_url = f"/v1/thumbnails/{sha16}.svg"
+                    except Exception:
+                        pass
+                    return {"thumb_url": thumb_url,
+                            "bbox": geo.get("bbox"),
+                            "volume_cm3": geo.get("volume_cm3"),
+                            "weight_kg": geo.get("weight_kg"),
+                            "features": geo.get("features", {}),
+                            "source": geo.get("_source"),
+                            "ok": not geo.get("error")}
+                except Exception as e:
+                    return {"ok": False, "error": repr(e)}
+    return {"ok": False, "reason": "no STEP attachment",
+            "thumb_url": None, "bbox": None, "volume_cm3": None, "weight_kg": None,
+            "features": {}, "source": None}
+
+
+def _image_funasr():
+    """VLM 感知适配器 (懒加载; 测试可 monkeypatch 隔离真模型)。
+    缺适配器 → parse_image 显式 MOCK, 不冒充生产感知。"""
+    from bootstrap import build_controller
+    return build_controller().funasr
+
+
+@router.get("/v1/mail/{mail_id}/context/image")
+def mail_context_image(mail_id: str) -> Dict[str, Any]:
+    """B-3' 图片区 (T5): 附件图片 → VLM perceive_image (只出感知, 不定价格)。
+    实时感知语义与 geometry 区一致; MOCK/离线/异常均诚实标注, 不冒充。"""
+    parsed = _parse_mail(mail_id)   # mail 缺失 → 404
+    eml_path = parsed.get("path")
+    imgs = fi.save_image_attachments(eml_path, str(_MAILBOX_DIR)) if eml_path else []
+    if not imgs:
+        # 正常负结果 (多数邮件无图纸图片): 不进 controller, 轻路径
+        return {"ok": True, "count": 0, "images": [], "reason": "no image attachment"}
+    try:
+        funasr = _image_funasr()
+    except Exception as e:  # noqa — 适配器起不来 → 空结果 + 原因, 不崩区
+        return {"ok": True, "count": 0, "images": [],
+                "reason": f"vlm adapter unavailable: {e!r}"}
+    out: List[Dict[str, Any]] = []
+    for im in imgs:
+        base = {"name": im["name"], "path": im["path"], "sha16": im["sha16"]}
+        try:
+            r = fi.parse_image(im["path"], funasr)
+        except Exception as e:  # noqa — 单图感知炸不拖垮整区
+            out.append(dict(base, perception=None, _mock=True,
+                            _source="error", error=repr(e)))
+            continue
+        out.append(dict(base, perception=r.get("perception"),
+                        _mock=r.get("_mock"), _source=r.get("_source")))
+    return {"ok": True, "count": len(out), "images": out}
+
+
+@router.get("/v1/mail/{mail_id}/context/rag")
+def mail_context_rag(mail_id: str, top_k: int = 4) -> Dict[str, Any]:
+    """B-3 RAG 区: subject+body → rag.search."""
+    from bootstrap import build_controller
+    c = build_controller()
+    parsed = _parse_mail(mail_id)
+    query = (parsed.get("subject", "") + " " + (parsed.get("body", "") or "")[:500]).strip()
+    if not query:
+        return {"query": "", "hits": [], "mock": True}
+    res = c.rag.search(query, limit=top_k)
+    return {"query": query[:200], "hits": res.get("hits", []),
+            "mock": res.get("_mock", True),
+            "source": res.get("_source")}
+
+
+@router.get("/v1/mail/{mail_id}/context/pending")
+def mail_context_pending(mail_id: str, limit: int = 20) -> Dict[str, Any]:
+    """B-4 未办区: crm.pending_for (按 mail 关联客户过滤, 若能解析)."""
+    from bootstrap import build_controller
+    c = build_controller()
+    parsed = _parse_mail(mail_id)
+    sender = parsed.get("from", "") or ""
+    name = sender.split("<")[0].strip() or sender
+    cid = c.crm.customer_id_by_name(name) if name else None
+    tasks = c.crm.pending_for(customer_id=cid, limit=limit)
+    return {"customer_id": cid, "tasks": tasks, "count": len(tasks)}
+
+
+@router.get("/v1/mail/{mail_id}/context/verification")
+def mail_context_verification(mail_id: str) -> Dict[str, Any]:
+    """B-5 门禁区: verification.run (status + reasons + conflicts)."""
+    from bootstrap import build_controller
+    c = build_controller()
+    cid = _context_id_for(mail_id)
+    if not cid:
+        return {"status": "UNKNOWN", "reasons": [], "conflicts": [],
+                "risk_score": 0.0, "gate_history": [],
+                "note": "no context_id bound; 运行 quote+verify 后重试"}
+    ctx_path = _CONTEXTS_DIR / f"{cid}.json"
+    if not ctx_path.exists():
+        return {"status": "UNKNOWN", "reasons": [], "conflicts": [],
+                "risk_score": 0.0, "gate_history": [],
+                "note": f"context file missing: {cid}"}
+    ctx_dict = json.loads(ctx_path.read_text(encoding="utf-8"))
+    res = c.verify.run(ctx_dict)
+    return {
+        "status": res.get("status", "UNKNOWN"),
+        "reasons": res.get("reasons", []),
+        "conflicts": res.get("conflicts", []),
+        "risk_score": res.get("risk_score", 0.0),
+        "gate_history": res.get("gate_history", []),
+        "checks": res.get("checks", []),
+    }
+
+
+@router.get("/v1/mail/{mail_id}/context/postmortem")
+def mail_context_postmortem(mail_id: str) -> Dict[str, Any]:
+    """B-6 复盘区: crm.postmortems 表聚合 + 知识回流."""
+    from bootstrap import build_controller
+    c = build_controller()
+    parsed = _parse_mail(mail_id)
+    sender = parsed.get("from", "") or ""
+    name = sender.split("<")[0].strip() or sender
+    cid = c.crm.customer_id_by_name(name) if name else None
+    # 全局 postmortems (limit 20), 按 cid 聚合
+    pms_rows = c.crm._conn.execute(
+        "SELECT context_id,outcome,actual_cost,note,created_at FROM postmortems "
+        "ORDER BY created_at DESC LIMIT ?", (20,)
+    ).fetchall()
+    cols = ["context_id", "outcome", "actual_cost", "note", "created_at"]
+    pms = [dict(zip(cols, r)) for r in pms_rows]
+    won = sum(1 for p in pms if p.get("outcome") == "won")
+    lost = sum(1 for p in pms if p.get("outcome") == "lost")
+    cost_dev = [p for p in pms if p.get("actual_cost") is not None]
+    lead_over = [p for p in pms if (p.get("note") or "").find("超") >= 0]
+    return {
+        "customer_id": cid, "won_count": won, "lost_count": lost,
+        "past_cost_deviations": cost_dev[:5],
+        "past_leadtime_overruns": lead_over[:5],
+        "knowledge_updates": [],
+        "total": len(pms),
+    }
+
+
+@router.get("/v1/mail/{mail_id}/context/commercial")
+def mail_context_commercial(mail_id: str) -> Dict[str, Any]:
+    """B-7 落地成本区: commercial.compute_commercial."""
+    from bootstrap import build_controller
+    c = build_controller()
+    cid = _context_id_for(mail_id)
+    if not cid:
+        return {"ok": False, "reason": "no context_id bound; 运行 quote 后重试",
+                "unit_price": None, "total_price": None, "margin_pct": None,
+                "freight_cny": None, "duty_cny": None, "landed_cost": None,
+                "incoterms": None}
+    ctx_path = _CONTEXTS_DIR / f"{cid}.json"
+    if not ctx_path.exists():
+        return {"ok": False, "reason": f"context file missing: {cid}"}
+    ctx_dict = json.loads(ctx_path.read_text(encoding="utf-8"))
+    rfq = ctx_dict.get("rfq", {})
+    com = ctx_dict.get("commercial", {})
+    quote = com.get("quote", com)
+    if not quote:
+        return {"ok": False, "reason": "no quote in context"}
+    try:
+        landed = commercial_mod.compute_commercial(
+            quote=quote, rfq=rfq, cfg=c.commercial_cfg,
+            destination_country=rfq.get("destination_country"),
+            shipping_mode=rfq.get("shipping_mode"),
+            incoterm=rfq.get("incoterm"),
+            hs_code=rfq.get("hs_code"),
+        )
+        landed["ok"] = True
+        return landed
+    except Exception as e:
+        return {"ok": False, "error": repr(e)}
+
+
+@router.get("/v1/mail/{mail_id}/context/trace")
+def mail_context_trace(mail_id: str) -> Dict[str, Any]:
+    """B-8 Trace 区: data/traces/*.jsonl (observability.Tracer 输出)."""
+    # 简单扫 traces 目录, 不绑定到具体 cid
+    _TRACES_DIR.mkdir(parents=True, exist_ok=True)
+    events = []
+    for jf in sorted(_TRACES_DIR.glob("*.jsonl"), key=lambda x: x.stat().st_mtime, reverse=True)[:3]:
+        try:
+            for line in jf.read_text(encoding="utf-8", errors="ignore").splitlines()[-50:]:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    events.append(json.loads(line))
+                except Exception:
+                    pass
+        except Exception:
+            continue
+    return {"events": events[-50:], "count": len(events[-50:])}
+
+
+# ---- 必须放最后: {mail_id} 会贪婪吃掉 /context/* 子路径 ----
+@router.get("/v1/mail/{mail_id}")
+def mail_detail(mail_id: str) -> Dict[str, Any]:
+    """邮件详情: 仅当所有 /context/* 都不匹配时才落到这里."""
+    return _parse_mail(mail_id)
+
+
+# ---------------- v3.0 HITL 审批面板数据 ----------------
+def _write_draft(cid: str, draft: Dict[str, Any]) -> Path:
+    """写草稿到 data/drafts/{cid}.json (原子覆盖)."""
+    _DRAFTS_DIR.mkdir(parents=True, exist_ok=True)
+    p = _DRAFTS_DIR / f"{cid}.json"
+    p.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding="utf-8")
+    return p
+
+
+@router.get("/v1/mail/{mail_id}/context/hitl")
+def mail_context_hitl(mail_id: str) -> Dict[str, Any]:
+    """B-9 HITL 面板: 草稿全文 + 报价 sha256 锁 + 是否可批准.
+
+    iron-rule-1 可视化: quote_sha256_locked = 草稿生成时的报价 hash;
+    若实际 context 报价被篡改, locked=false, UI 显示红字拦截.
+    """
+    cid = _context_id_for(mail_id)
+    if not cid:
+        return {"ok": False, "reason": "no context_id", "can_approve": False,
+                "draft": None, "quote": None, "quote_sha16": None,
+                "quote_sha16_locked": None, "locked": False,
+                "verification_status": "UNKNOWN"}
+    from services.reply import build_reply
+    from bootstrap import build_controller
+    c = build_controller()
+    ctx_path = _CONTEXTS_DIR / f"{cid}.json"
+    if not ctx_path.exists():
+        return {"ok": False, "reason": f"context file missing: {cid}",
+                "can_approve": False, "draft": None, "quote": None,
+                "quote_sha16": None, "quote_sha16_locked": None, "locked": False,
+                "verification_status": "UNKNOWN"}
+    ctx_dict = json.loads(ctx_path.read_text(encoding="utf-8"))
+    verification = c.verify.run(ctx_dict)
+    draft = build_reply(ctx_dict, verification)
+    # G2/G2b: 报价单 PDF+XLSX 附件 (draft_only; 缺库显式降级, 不炸链)
+    try:
+        from services.quote_pdf import attach_quote_pdf
+        from services.quote_xlsx import attach_quote_xlsx
+        attach_quote_pdf(draft, quote=(ctx_dict.get("commercial", {}) or {}).get("quote", {}) or {},
+                         context_id=cid, customer=ctx_dict.get("customer") or {},
+                         rfq=ctx_dict.get("rfq") or {})
+        attach_quote_xlsx(draft, quote=(ctx_dict.get("commercial", {}) or {}).get("quote", {}) or {},
+                          context_id=cid, customer=ctx_dict.get("customer") or {},
+                          rfq=ctx_dict.get("rfq") or {})
+    except Exception as e:  # noqa
+        draft["attachments"] = []
+        draft["attachment_error"] = repr(e)
+    # 锁住 sha16 = 草稿生成时报价的数字指纹
+    quote = (ctx_dict.get("commercial", {}) or {}).get("quote", {}) or {}
+    current_hash = _sha16(json.dumps({
+        "unit_price": quote.get("unit_price"),
+        "final_price": quote.get("final_price"),
+        "currency": quote.get("currency"),
+        "lead_time_days": quote.get("lead_time_days"),
+    }, ensure_ascii=False, sort_keys=True))
+    # iron-rule-1 持久锁定: 先查已有 draft 中的锁; 没有则用 current_hash 初始化
+    existing_locked = None
+    draft_path = _DRAFTS_DIR / f"{cid}.json"
+    if draft_path.exists():
+        try:
+            existing_locked = json.loads(draft_path.read_text(encoding="utf-8")).get("quote_sha16_locked")
+        except Exception:
+            pass
+    if existing_locked:
+        locked_hash = existing_locked
+    else:
+        locked_hash = current_hash  # 首次锁定 = 当前 hash
+    locked = locked_hash == current_hash
+    # 只有 HITL/CLARIFY (orchestrator 将 CLARIFY bucket 到 STATE_HITL 等人工兜底) + 锁未破 才允许"批准"
+    # BLOCKED 不可人工直接放行 (铁律②: 须修正参数重新 intake); PASS 无需批准.
+    can_approve = (verification.get("status") in ("HITL", "CLARIFY")) and locked
+    out_draft = dict(draft)
+    out_draft["quote_sha16_locked"] = locked_hash
+    _write_draft(cid, out_draft)
+    return {
+        "ok": True,
+        "context_id": cid,
+        "mail_id": mail_id,
+        "draft": out_draft,
+        "quote": quote,
+        "quote_sha16": current_hash,
+        "quote_sha16_locked": locked_hash,
+        "locked": locked,
+        "can_approve": can_approve,
+        "verification_status": verification.get("status"),
+        "reasons": verification.get("reasons", []),
+    }

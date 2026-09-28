@@ -1,0 +1,12 @@
+# occ 几何环境（cadquery 2.8.0 · OCP · Python 3.11）
+name: occ
+channels: [conda-forge]
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - cadquery==2.8.0
+      - pyyaml
+      - fastapi
+      - uvicorn
+      - openpyxl

@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UEA-NCPAAI v4.0.0 · Workbench</title>
+<style>
+/* ============ DESIGN-suite-v4 tokens ============ */
+:root{
+  --bg:#0A0E12; --panel:#121820; --panel2:#0E1419;
+  --ink:#D1D5DB; --ink2:#9AA4B2; --ink3:#6B7280;
+  --acc:#76B900; --accdim:#4E7A0B;
+  --chat:#3B82F6; --warn:#F59E0B; --err:#EF4444; --ok:#34D399;
+  --line:#1E2933; --line2:#26323E;
+  --mono:"JetBrains Mono","Cascadia Code","Fira Code",Consolas,ui-monospace,monospace;
+  --sans:"Inter","PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;line-height:1.45;overflow:hidden}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:#26323E;border-radius:4px}
+button{font-family:var(--sans);cursor:pointer;border:none;background:none;color:var(--ink)}
+input,select,textarea{font-family:var(--sans);background:var(--panel2);border:1px solid var(--line2);color:var(--ink);border-radius:4px;font-size:12px}
+.mono{font-family:var(--mono)}
+.tag{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;line-height:1;padding:2.5px 6px;border-radius:3px;border:1px solid var(--line2);color:var(--ink2);background:rgba(255,255,255,.02);white-space:nowrap}
+.tag.ok{color:var(--ok);border-color:rgba(52,211,153,.35)}
+.tag.warn{color:var(--warn);border-color:rgba(245,158,11,.4)}
+.tag.err{color:var(--err);border-color:rgba(239,68,68,.45)}
+.tag.acc{color:var(--acc);border-color:rgba(118,185,0,.4)}
+.tag.blue{color:var(--chat);border-color:rgba(59,130,246,.4)}
+.tag.mut{color:var(--ink3)}
+.hidden{display:none!important}
+
+/* ============ Topbar ============ */
+#topbar{height:56px;display:flex;align-items:stretch;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0D1318,#0A0E12)}
+.brand{display:flex;align-items:center;gap:10px;padding:0 16px;border-right:1px solid var(--line)}
+.logo{width:22px;height:22px;border-radius:4px;background:var(--acc);display:grid;place-items:center;color:#0A0E12;font-weight:800;font-size:13px;font-family:var(--mono)}
+.brand b{font-size:13.5px}
+.brand .ver{color:var(--acc);font-family:var(--mono);font-size:11px}
+.nav{display:flex;align-items:center;gap:2px;padding:0 8px;flex:1;overflow-x:auto}
+.nav .tabnav{height:100%;padding:0 16px;font-size:12.5px;color:var(--ink2);border-bottom:2px solid transparent;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.nav .tabnav.active{color:var(--ink);border-bottom-color:var(--acc)}
+.nav .tabnav:hover{color:var(--ink)}
+.top-right{display:flex;align-items:center;gap:10px;padding:0 14px;border-left:1px solid var(--line)}
+.health{display:flex;gap:10px;align-items:center;font-size:11px;color:var(--ink2)}
+.health i{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px}
+.dg{background:var(--ok);box-shadow:0 0 5px var(--ok)}
+.dw{background:var(--warn);box-shadow:0 0 5px var(--warn)}
+.iconbtn{width:28px;height:26px;border:1px solid var(--line2);border-radius:4px;font-size:13px;display:grid;place-items:center;color:var(--ink2);background:none}
+.iconbtn:hover{color:var(--acc);border-color:var(--accdim)}
+
+/* ============ Shell 三栏 ============ */
+#shell{display:grid;grid-template-columns:minmax(280px,26%) minmax(520px,42%) minmax(380px,32%);height:calc(100vh - 56px - 28px)}
+.col{min-height:0;display:flex;flex-direction:column;border-right:1px solid var(--line)}
+.col:last-child{border-right:none}
+.col-head{height:34px;display:flex;align-items:center;gap:8px;padding:0 10px;border-bottom:1px solid var(--line);background:var(--panel);flex-shrink:0}
+.col-title{font-size:11px;color:var(--ink3);letter-spacing:1.2px;font-weight:600;text-transform:uppercase}
+
+/* ============ 左 Inbox ============ */
+#inboxTools{display:flex;gap:6px;padding:8px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+#inboxTools .srch{flex:1 1 100%;padding:5px 8px}
+#inboxTools .frow{display:flex;gap:6px;width:100%}
+#inboxTools select{flex:1;padding:4px}
+#mailList{flex:1;overflow-y:auto}
+.mail{display:block;width:100%;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;background:transparent;transition:background .15s}
+.mail:hover{background:#131B22}
+.mail.active{background:#16201A;box-shadow:inset 2px 0 0 var(--acc)}
+.mail .mrow{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:3px}
+.mail .msub{font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mail .mfrom{font-size:11px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mail .mbadges{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}
+
+/* ============ 中 Inspector ============ */
+#inspectTabs{display:flex;align-items:center;border-bottom:1px solid var(--line);background:var(--panel);flex-shrink:0;overflow-x:auto}
+.insp-tab{height:34px;padding:0 14px;font-size:12px;color:var(--ink2);border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.insp-tab:hover{color:var(--ink)}
+.insp-tab.active{color:var(--ink);border-bottom-color:var(--acc)}
+#inspectBody{flex:1;overflow-y:auto;position:relative}
+.pane{padding:12px 14px;display:none}
+.pane.active{display:block}
+
+#goldenChain{display:flex;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid var(--line);background:var(--panel2);overflow-x:auto;flex-shrink:0}
+.gc-step{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--ink3);white-space:nowrap}
+.gc-step .dot{width:16px;height:16px;border-radius:50%;border:1px solid var(--line2);display:grid;place-items:center;font-size:8.5px;font-family:var(--mono);background:#0E1419}
+.gc-step.done .dot{border-color:var(--acc);color:var(--acc);background:rgba(118,185,0,.08)}
+.gc-step.active .dot{border-color:var(--warn);color:var(--warn);background:rgba(245,158,11,.08)}
+.gc-step.flag .dot{border-color:var(--err);color:var(--err)}
+.gc-arrow{color:var(--ink3);font-size:9px}
+.gc-sha{font-family:var(--mono);font-size:9px;color:var(--acc)}
+
+.kvrow{display:grid;grid-template-columns:84px 1fr;gap:4px 8px;font-size:12px;margin:6px 0}
+.kvrow .k{color:var(--ink3)}
+.mail-body{margin-top:10px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);padding:12px;white-space:pre-wrap;font-size:12.5px;color:var(--ink2)}
+.mail-doc-head h3{font-size:15px;margin-bottom:4px}
+
+.quote-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 12px}
+.qcard{border:1px solid var(--line2);border-radius:4px;padding:8px 10px;background:var(--panel2)}
+.qcard .v{font-size:17px;font-weight:700;font-family:var(--mono)}
+.qcard .v.acc{color:var(--acc)}
+.qcard .v.warn{color:var(--warn)}
+.qcard .l{font-size:10.5px;color:var(--ink3);margin-top:2px}
+.lock-line{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--acc);background:rgba(118,185,0,.06);border:1px solid rgba(118,185,0,.25);border-radius:4px;padding:5px 8px;margin:4px 0 10px}
+table.tbl{width:100%;border-collapse:collapse;font-size:11.5px}
+table.tbl th{text-align:left;color:var(--ink3);font-weight:500;padding:5px 6px;border-bottom:1px solid var(--line2)}
+table.tbl td{padding:5px 6px;border-bottom:1px solid var(--line)}
+table.tbl tr:hover td{background:rgba(255,255,255,.015)}
+.right{text-align:right}
+
+.tl{position:relative;padding-left:18px;margin-left:4px}
+.tl::before{content:"";position:absolute;left:4px;top:4px;bottom:4px;width:1px;background:var(--line2)}
+.tl-item{position:relative;margin-bottom:14px}
+.tl-item::before{content:"";position:absolute;left:-18px;top:4px;width:9px;height:9px;border-radius:50%;background:var(--bg);border:2px solid var(--ink3)}
+.tl-item.ok::before{border-color:var(--acc)}
+.tl-item.warn::before{border-color:var(--warn)}
+.tl-item .t1{display:flex;gap:8px;align-items:center;font-size:12px}
+.tl-item .t2{color:var(--ink3);font-size:11px;margin-top:2px}
+
+.hitl-banner{display:flex;gap:10px;align-items:flex-start;border:1px solid rgba(245,158,11,.4);background:rgba(245,158,11,.06);border-radius:4px;padding:10px 12px;margin-bottom:12px}
+.hitl-ico{font-size:18px}
+.hitl-title{font-weight:700;color:var(--warn);font-size:13px}
+.evchain{border:1px solid var(--line2);border-radius:4px;overflow:hidden;margin:10px 0}
+.evrow{display:flex;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:12px;align-items:center}
+.evrow:last-child{border-bottom:none}
+.evrow .evk{width:84px;color:var(--ink3);flex-shrink:0}
+.evrow .evv{flex:1;color:var(--ink2);min-width:0}
+.evrow .evs{flex-shrink:0}
+.actionbar{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.btn{padding:6px 16px;border-radius:4px;font-size:12px;border:1px solid var(--line2);color:var(--ink2)}
+.btn:hover{border-color:var(--accdim);color:var(--ink)}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#0A0E12;font-weight:600}
+.btn.primary:hover{background:#8FDC1A;color:#0A0E12}
+.btn.danger{border-color:rgba(239,68,68,.5);color:var(--err)}
+.btn.danger:hover{background:rgba(239,68,68,.1);color:var(--err)}
+.btn:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line2);color:var(--ink3)}
+
+#geo3d{border:1px solid var(--line2);border-radius:4px;background:radial-gradient(circle at 50% 35%,#101B26,#0B1016 70%);height:240px;position:relative;overflow:hidden;margin-top:10px}
+#geo3d svg{width:100%;height:100%}
+.geo-label{position:absolute;font-family:var(--mono);font-size:10px;color:var(--acc)}
+.geo-title{position:absolute;top:8px;left:10px;font-size:11px;color:var(--ink2)}
+
+/* ============ 右 Chat ============ */
+.st-seg{display:flex;border-bottom:1px solid var(--line);flex-shrink:0}
+.st-seg button{flex:1;height:30px;font-size:12px;color:var(--ink3);border-bottom:2px solid transparent}
+.st-seg button.active{color:var(--acc);border-bottom-color:var(--acc)}
+#chatThread{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:96%}
+.msg .who{font-size:10.5px;color:var(--ink3);margin-bottom:3px;display:flex;gap:6px;align-items:center}
+.msg .bubble{border-radius:4px;padding:8px 10px;font-size:12.5px}
+.msg.user{align-self:flex-end}
+.msg.user .bubble{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35);color:#CFE0FF}
+.msg.agent{max-width:100%}
+.msg.agent .bubble{background:var(--panel2);border:1px solid var(--line2);color:var(--ink)}
+.msg.sys{align-self:center}
+.skill-strip{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.skill-chip{font-family:var(--mono);font-size:10px;padding:2.5px 7px;border-radius:3px;border:1px solid var(--line2);color:var(--ink2);background:rgba(255,255,255,.02);display:inline-flex;gap:3px;align-items:center}
+.cite-wrap{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
+.cite-chip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;padding:2.5px 8px;border-radius:3px;border:1px solid rgba(59,130,246,.4);color:var(--chat);background:rgba(59,130,246,.07);cursor:pointer}
+.cite-chip:hover{background:rgba(59,130,246,.16)}
+.trace-det{font-size:11px;margin-top:6px;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.trace-det summary{padding:4px 8px;cursor:pointer;color:var(--ink3);user-select:none}
+.trace-det pre{margin:0;padding:8px;background:#0B0F14;font-family:var(--mono);font-size:10.5px;color:var(--ink2);overflow-x:auto;white-space:pre-wrap}
+
+#chatInput{flex-shrink:0;padding:8px 10px 10px;border-top:1px solid var(--line);background:var(--panel)}
+#inputRow{display:flex;gap:6px;align-items:stretch}
+#chatInput textarea{flex:1;height:52px;padding:7px 9px;resize:none;font-size:12.5px;line-height:1.5}
+#chatInput .hint{font-size:10px;color:var(--ink3);margin-top:5px;display:flex;gap:10px;flex-wrap:wrap}
+kbd{font-family:var(--mono);padding:0 3px;border:1px solid var(--line2);border-radius:2px;background:#0E1419;font-size:9.5px;color:var(--ink2)}
+#quickChips{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+
+#skillConsole{flex:1;overflow-y:auto;padding:10px 12px}
+.sk-group{font-size:10.5px;color:var(--ink3);letter-spacing:1px;text-transform:uppercase;margin:14px 0 6px;font-weight:700}
+.sk-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--line);border-radius:4px;margin-bottom:6px;background:var(--panel2);cursor:pointer}
+.sk-item:hover{border-color:var(--accdim)}
+.sk-ico{font-size:14px}
+.sk-name{font-size:12px;font-weight:600}
+.sk-id{font-family:var(--mono);font-size:9.5px;color:var(--acc)}
+.sk-desc{font-size:10.5px;color:var(--ink3)}
+.sk-meta{margin-left:auto;display:flex;gap:4px;flex-direction:column;align-items:flex-end}
+.sk-run{font-size:16px;color:var(--ink3)}
+.sk-item:hover .sk-run{color:var(--acc)}
+
+/* ============ Footer ============ */
+#statusbar{height:28px;display:flex;align-items:center;gap:16px;padding:0 12px;border-top:1px solid var(--line);background:var(--panel);font-size:10.5px;color:var(--ink3);font-family:var(--mono);white-space:nowrap;overflow-x:auto}
+#statusbar .iron{color:var(--warn);border:1px solid rgba(245,158,11,.35);padding:2px 8px;border-radius:3px}
+
+/* ============ Command Palette ============ */
+#palette{position:fixed;inset:0;background:rgba(4,6,8,.72);display:none;justify-content:center;align-items:flex-start;padding-top:16vh;z-index:90}
+#palette.show{display:flex}
+#palBox{width:520px;max-width:calc(100vw - 40px);background:var(--panel);border:1px solid var(--line2);border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden}
+#palBox input{width:100%;border:none;border-bottom:1px solid var(--line);padding:13px 14px;font-size:13px;background:transparent}
+#palList{max-height:340px;overflow-y:auto;padding:6px}
+.pal-item{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:4px;cursor:pointer;font-size:12.5px}
+.pal-item:hover,.pal-item.sel{background:#16201A}
+.pal-item .pl{flex:1}
+.pal-item .pk{font-family:var(--mono);font-size:10px;color:var(--ink3)}
+
+/* ============ 响应式 ============ */
+@media (max-width:1280px){
+  #shell{grid-template-columns:240px 1fr 320px}
+  #geo3d{height:180px}
+}
+@media (max-width:960px){
+  body{overflow:auto}
+  #shell{grid-template-columns:1fr;grid-auto-rows:auto;height:auto}
+  .col{border-right:none;border-bottom:1px solid var(--line);min-height:420px}
+}
+</style>
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">
+    <div class="logo">U</div>
+    <b>Union Export Agent</b>
+    <span class="ver">v4.0.0 · draft_only · Mock</span>
+  </div>
+  <nav class="nav">
+    <button class="tabnav active">🧰 工作台</button>
+    <button class="tabnav">📬 邮件台</button>
+    <button class="tabnav">🔧 Skills</button>
+    <button class="tabnav">⚙️ 设置</button>
+  </nav>
+  <div class="top-right">
+    <div class="health"><span><i class="dg"></i>engine: Timo live</span><span><i class="dg"></i>API ok</span><span><i class="dw"></i>HITL 1</span></div>
+    <button class="iconbtn" title="命令面板 Ctrl+K" onclick="Workbench.openPalette()">⌘</button>
+    <span class="tag acc" title="draft_only 铁律 · 草稿不直接发出">draft_only 🔒</span>
+    <span class="tag blue">NCP-AAI</span>
+  </div>
+</header>
+
+<main id="shell">
+
+  <!-- 左栏 Inbox -->
+  <aside class="col" id="colInbox">
+    <div class="col-head"><span class="col-title">Inbox · 线索</span><span class="tag mut" id="inboxCount"></span></div>
+    <div id="inboxTools">
+      <input id="mailSearch" class="srch" placeholder="🔍 搜索 subject / from / 关键词…">
+      <div class="frow">
+        <select id="mailFilter">
+          <option value="ALL">全部状态</option>
+          <option value="NEW">新</option>
+          <option value="HITL">HITL</option>
+          <option value="BLOCKED">BLOCKED</option>
+          <option value="PASS">PASS</option>
+        </select>
+        <button class="iconbtn" title="刷新" onclick="Workbench.refresh()">↻</button>
+        <button class="iconbtn" title="上传 .eml" onclick="Workbench.toast('Demo: 上传 .eml（模拟 S1 进场）')">⬆</button>
+      </div>
+    </div>
+    <div id="mailList"></div>
+  </aside>
+
+  <!-- 中栏 Inspector -->
+  <main class="col" id="colInspect">
+    <div class="col-head">
+      <span class="col-title">Inspector · 检视器</span>
+      <span class="tag acc" id="ctxPill" style="display:none"></span>
+      <span style="margin-left:auto" class="tag mut">audit: 12 @ 5min</span>
+    </div>
+    <div id="goldenChain"></div>
+    <div id="inspectTabs">
+      <button class="insp-tab active" data-tab="mail" onclick="Workbench.switchInspectTab('mail')">📧 邮件</button>
+      <button class="insp-tab" data-tab="draft" onclick="Workbench.switchInspectTab('draft')">📝 草稿</button>
+      <button class="insp-tab" data-tab="hist" onclick="Workbench.switchInspectTab('hist')">🕘 客户历史</button>
+      <button class="insp-tab" data-tab="approval" onclick="Workbench.switchInspectTab('approval')">🛡 审批</button>
+      <button class="insp-tab" data-tab="hitl" onclick="Workbench.switchInspectTab('hitl')">👤 HITL</button>
+    </div>
+    <div id="inspectBody">
+      <div class="pane active" id="pane-mail"></div>
+      <div class="pane" id="pane-draft"></div>
+      <div class="pane" id="pane-hist"></div>
+      <div class="pane" id="pane-approval"></div>
+      <div class="pane" id="pane-hitl"></div>
+    </div>
+  </main>
+
+  <!-- 右栏 Agent -->
+  <aside class="col" id="colChat">
+    <div class="col-head">
+      <span class="col-title">Agent · 对话</span>
+      <span class="tag mut" id="boundTag">未绑定</span>
+      <span class="tag blue" style="margin-left:auto" onclick="Workbench.toast('session 强绑 bound_mail_id · 写入 chat_sessions jsonl')">session ✓</span>
+    </div>
+    <div class="st-seg">
+      <button class="active" data-m="chat" onclick="Workbench.toggleChatMode('chat')">💬 对话</button>
+      <button data-m="console" onclick="Workbench.toggleChatMode('console')">🔧 Skill Console <span style="font-family:var(--mono);font-size:10px;color:var(--ink3)">17</span></button>
+    </div>
+    <div id="chatThread"></div>
+    <div id="skillConsole" class="hidden"></div>
+    <div id="chatInput">
+      <div id="inputRow">
+        <textarea id="chatTa" placeholder="输入指令：跑门禁 / 算报价 / 查 DFM / 起草回复 / 跑黄金链（Enter 发送）"></textarea>
+        <button class="btn primary" style="width:74px" onclick="Workbench.send()">发送 ↵</button>
+      </div>
+      <div id="quickChips"></div>
+      <div class="hint"><span>Ctrl+K 面板</span><span>Ctrl+1..5 切 tab</span><span>Ctrl+B 焦点</span><span>Esc 关闭</span></div>
+    </div>
+  </aside>
+</main>
+
+<footer id="statusbar">
+  <span><i class="dg"></i> engine: Timo live</span>
+  <span>API: ok</span>
+  <span>LLM: auto</span>
+  <span>dispatcher: auto</span>
+  <span>skill_audit: 12 (5min)</span>
+  <span>OPENSHell: v1.0</span>
+  <span class="iron">铁律① 🔒 LLM 无权裁决价格 — 报价 = 确定性引擎 + sha16 锁</span>
+</footer>
+
+<div id="palette">
+  <div id="palBox">
+    <input id="palInput" placeholder="输入动作…（批准 / 算报价 / 跑门禁 / 打开 Skills）">
+    <div id="palList"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   UEA-NCPAAI v4.0.0 Workbench · 单文件交互原型（Mock，不接真 API）
+   对齐 PRD-v4-workbench §2/§5 + DESIGN-suite-v4 tokens
+============================================================ */
+(function(){
+"use strict";
+var $ = function(s){ return document.querySelector(s); };
+
+var state = {
+  mails: [], curMailId: null, filter: 'ALL', search: '',
+  quote: null, gate: null, approved: false,
+  messages: [], chatMode: 'chat'
+};
+
+/* ---------- mock 数据 ---------- */
+var M = [
+  { id:'M-2201', from:'采购 · 徐工集团 · Mr. Wang', subject:'RFQ #A11 — DIN 2527 盲板法兰 1200 件 · 交期 26-10-15', st:'NEW', badges:['🔒'], time:'09:42',
+    body:'Dear Supplier,\n\n徐工集团采购部，随附图纸 DIN2527-2023 盲板法兰：\n\n1. 材质：S355JR（请按碳钢报价）\n2. 尺寸：DN100 PN16，OD 172 × t 18\n3. 数量：1200 pcs，年框架\n4. 表面：发黑\n5. 交期：2026-10-15（FOB 上海）\n\n请 24h 内回复最优价与 DFM 意见。',
+    ctx:'徐工集团 · 工程机械主机厂 · 年采购额 ¥4.2M' },
+  { id:'M-2202', from:'甲方转包 · 三一重工', subject:'量产 M37 — 阀块超声清洗后表面白斑 · 需 HITL', st:'HITL', badges:['🛡HITL','💬3'], time:'昨天 16:20',
+    body:'白斑问题第三次复现。客户索赔窗口今天 18:00 关闭，需决策：A) 返工喷砂；B) 折价接收。附件：金相图 + 显微照片。请输出建议与风险评分。',
+    ctx:'三一重工 · 甲方转包 · 返工历史 2 批' },
+  { id:'M-2203', from:'新询盘 · 中联重科', subject:'RFQ #B04 — 泵车支腿销轴 840 件 · 45# 调质', st:'NEW', badges:['🔒'], time:'昨天 11:05',
+    body:'外径 85 h7，长 480，调质 HRC24-28，发黑。供应商大修过线时间紧迫，报价越快越好。',
+    ctx:'中联重科 · 新客户 · 无历史' },
+  { id:'M-2204', from:'老客户 · 卡特彼勒（中国）', subject:'PO 跟进 #P88 — 上批 45# 轴套提前付款', st:'PASS', badges:['✅PASS'], time:'09-16',
+    body:'订单 P88-99 已确认，财务通知本周五提前付款。感谢配合。',
+    ctx:'卡特彼勒 · 年采购额 ¥8.1M · 准时率 100%' },
+  { id:'M-2205', from:'外协 · 华中精工', subject:'后处理异常 — 阳极氧化色差 ΔE=3.8 · BLOCKED', st:'BLOCKED', badges:['🚫BLOCKED'], time:'09-15',
+    body:'内六角块 600pcs 氧化色差超标，需要您决策：换膜系（AZ31 磨砂）还是分色出货。',
+    ctx:'华中精工 · 外协 · 质量事件 1' },
+  { id:'M-2206', from:'供应商 · 广东远航 CNC', subject:'产能确认 — #A11 法兰 1200 件可承接', st:'NEW', badges:['🔒'], time:'09-14',
+    body:'三轴 + 四轴卧加均可，打样周期 3 天，量产 15 天。价格就按框架协议浮动 5%。',
+    ctx:'广东远航 · 框架供应商 · 产能 15d' },
+  { id:'M-2207', from:'QA · 内部检验', subject:'FAI 报告 — M37 阀块第二批 12/12 PASS', st:'PASS', badges:['✅PASS','📎'], time:'09-13',
+    body:'GD&T 全项合格，粗糙度 Ra0.8 达标。报告已存 VDC。',
+    ctx:'内部检验 · FAI 12/12' },
+  { id:'M-2208', from:'新客户 · 特变电工', subject:'RFQ #C12 — 变压器散热器安装板 4 尺寸组', st:'NEW', badges:['🔒'], time:'09-12',
+    body:'4 组尺寸共 2400 件，6061-T6 阳极氧化银白。返修率要求 < 0.5%。',
+    ctx:'特变电工 · 新客户 · 铜价联动条款' },
+  { id:'M-2209', from:'老客户 · 徐工', subject:'复购 — #A07 法兰 300 件（去年同期同款）', st:'PASS', badges:['✅PASS','💬1'], time:'09-11',
+    body:'按 2025 年合同价 + 铜价联动重报，客户历史 30 天内有 2 次复购。',
+    ctx:'徐工集团 · 30 天复购 2 次' },
+  { id:'M-2210', from:'风控 · 合规通知', subject:'Sanction 名单命中 — 无雷同，继续', st:'PASS', badges:['✅PASS'], time:'09-10',
+    body:'全量比对完成，本轮无禁运地区。',
+    ctx:'风控 · sanction 全量比对' }
+];
+
+var SKILLS = [
+  { id:'chat_understand', name:'意图理解', ico:'💬', iron:'llm_proposal', g:'对话编排', desc:'自然语言 → intent + slots + skill_hint' },
+  { id:'rag_recall', name:'RAG 召回', ico:'🔍', iron:'none', g:'对话编排', desc:'crm 历史 + rag 案例 + postmortem 记忆' },
+  { id:'context_lookup', name:'上下文聚合', ico:'🗂', iron:'none', g:'对话编排', desc:'1 次拉 8 区上下文，60s 缓存' },
+  { id:'skill_dispatch', name:'编排调度', ico:'🎯', iron:'none', g:'对话编排', desc:'dispatcher 强制 bound_context_id' },
+  { id:'cite_evidence', name:'引用证据', ico:'🔗', iron:'none', g:'对话编排', desc:'双轨引用，绝不改写数字' },
+  { id:'suggest_reply', name:'草稿建议', ico:'📝', iron:'draft_only', g:'对话编排', desc:'subject/body/status/locked 信封' },
+  { id:'parse_rfq', name:'解析 RFQ', ico:'📧', iron:'deterministic', g:'业务管道', desc:'邮件 → 需求槽位' },
+  { id:'extract_specs', name:'提取规格', ico:'📐', iron:'llm_proposal', g:'业务管道', desc:'图纸参数结构化' },
+  { id:'check_dfm', name:'DFM 检查', ico:'🔍', iron:'deterministic', g:'业务管道', desc:'薄壁 / 深孔 / 圆角冲突' },
+  { id:'calc_quote', name:'算报价', ico:'💰', iron:'deterministic 🔒', g:'业务管道', desc:'确定性引擎 + sha16 锁，LLM 无权裁决' },
+  { id:'verify_gate', name:'跑门禁', ico:'🛡', iron:'deterministic', g:'业务管道', desc:'verify_gate 步骤化校验' },
+  { id:'write_reply', name:'起草回复', ico:'✍️', iron:'draft_only', g:'业务管道', desc:'use_llm=true + sha16 锁' },
+  { id:'render_thumbnail', name:'STEP 预览', ico:'🧊', iron:'deterministic', g:'业务管道', desc:'自动渲染几何缩略' },
+  { id:'approve_gate', name:'批准门禁', ico:'✅', iron:'hitl_required', g:'批准', desc:'双确认 + 展示 sha16' },
+  { id:'hitl_explain', name:'HITL 解释', ico:'📖', iron:'none', g:'批准', desc:'reasons / conflicts / risk 转中文' },
+  { id:'golden_chain', name:'黄金链', ico:'🔗', iron:'deterministic', g:'端到端', desc:'一键 INTAKE→POSTMORTEM' },
+  { id:'audit_tail', name:'审计尾巴', ico:'📜', iron:'none', g:'质量', desc:'skill_audit.jsonl 最近 N 条' }
+];
+
+var GC = [
+  { k:'INTAKE' }, { k:'PARSE_RFQ' }, { k:'EXTRACT' }, { k:'DFM' },
+  { k:'CALC_QUOTE' }, { k:'VERIFY' }, { k:'APPROVE' }, { k:'POST' }
+];
+
+/* ---------- 工具 ---------- */
+function sha(s){ var h=0,i; for(i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))>>>0; } return ('0000000'+h.toString(16)).slice(-8); }
+function el(t,c){ var e=document.createElement(t); if(c) e.className=c; return e; }
+function esc(s){ return String(s).replace(/[&<>"]/g,function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
+function nowT(){ var d=new Date(),p=function(n){return (n<10?'0':'')+n;}; return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()); }
+function cur(){ return state.mails.filter(function(x){return x.id===state.curMailId;})[0]||null; }
+
+/* ============ Inbox ============ */
+function renderMailList(){
+  var box=$('#mailList'); box.innerHTML='';
+  var kw=state.search.toLowerCase();
+  var list=state.mails.filter(function(m){
+    if(state.filter!=='ALL' && m.st!==state.filter) return false;
+    if(kw && (m.subject+m.from+m.id).toLowerCase().indexOf(kw)<0) return false;
+    return true;
+  });
+  $('#inboxCount').textContent=list.length+' / '+state.mails.length;
+  if(!list.length){ box.innerHTML='<div style="padding:20px;color:var(--ink3);text-align:center">无匹配线索</div>'; return; }
+  list.forEach(function(m){
+    var b=el('button','mail'+(state.curMailId===m.id?' active':''));
+    var bd='<div class="mrow"><span class="msub">'+esc(m.subject)+'</span><span class="mono" style="font-size:10px;color:var(--ink3)">'+m.time+'</span></div>'+
+      '<div class="mfrom">'+esc(m.from)+'</div><div class="mbadges">';
+    m.badges.forEach(function(x){
+      var cls = x.indexOf('BLOCKED')>=0?'err':(x.indexOf('HITL')>=0?'warn':(x.indexOf('PASS')>=0?'ok':'acc'));
+      bd += '<span class="tag '+cls+'">'+x+'</span>';
+    });
+    bd += '</div>';
+    b.innerHTML=bd;
+    b.onclick=function(){ openMail(m.id); };
+    box.appendChild(b);
+  });
+}
+
+/* ============ 黄金链 ============ */
+function renderGC(){
+  var box=$('#goldenChain'); box.innerHTML='';
+  GC.forEach(function(s,i){
+    var cls='gc-step'+(s.done?' done':'')+(s.active?' active':'')+(s.flag?' flag':'');
+    var dot = s.done?'✓':(s.flag?'!':s.sha?'🔒':String(i+1));
+    var d=el('div',cls);
+    d.innerHTML='<span class="dot">'+dot+'</span><span>'+s.k+'</span>'+(s.sha?'<span class="gc-sha">'+s.sha+'</span>':'');
+    box.appendChild(d);
+    if(i<GC.length-1){ var a=el('span','gc-arrow'); a.textContent='→'; box.appendChild(a); }
+  });
+}
+
+/* ============ 中栏 panes ============ */
+function renderPanes(){
+  var m=cur();
+  renderMailPane(m); renderDraftPane(m); renderHistPane(m); renderApprovalPane(m); renderHitlPane(m);
+}
+
+function renderMailPane(m){
+  var p=$('#pane-mail');
+  if(!m){ p.innerHTML='<div style="padding:30px;color:var(--ink3);text-align:center">← 从左侧选择一封邮件</div>'; return; }
+  p.innerHTML='<div class="mail-doc-head"><h3>'+esc(m.subject)+'</h3>'+
+    '<div class="kvrow"><span class="k">编号</span><span class="mono">'+m.id+'</span></div>'+
+    '<div class="kvrow"><span class="k">发件人</span><span>'+esc(m.from)+'</span></div>'+
+    '<div class="kvrow"><span class="k">收件时间</span><span>'+m.time+'</span></div>'+
+    '<div class="kvrow"><span class="k">附件图纸</span><span><span class="tag acc mono">DIN2527-2023_A11.step</span> <span class="tag mono">Ra 6.3</span></span></div></div>'+
+    '<div class="mail-body">'+esc(m.body)+'</div>';
+}
+
+function renderDraftPane(m){
+  var p=$('#pane-draft');
+  var locked = !!(state.quote && state.gate && !state.gate.fail);
+  var draft='Subject: RE: '+(m?m.subject:'(未绑定)')+'\n\nDear Sir,\n\n随附修订报价单（'+(state.quote?state.quote.total:'¥ --,---')+'）与 DFM 意见。\n如确认请回 PO，我们即刻锁定产能。\n\nBest regards,\nUnion Export Agent';
+  p.innerHTML='<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">'+
+    '<span class="col-title" style="letter-spacing:1px">草稿 · suggest_reply</span>'+
+    (locked?'<span class="tag acc">🔒 sha16 已锁 · 可采纳</span>':'<span class="tag warn">未锁定 · 需先跑门禁</span>')+
+    '<span class="tag mut" style="margin-left:auto">use_llm=true</span></div>'+
+    (state.quote?'<div class="lock-line">🔒 LOCK sha:'+state.quote.sha+' · 价格字段已冻结，禁止 LLM 改写</div>':'')+
+    '<div class="mail-body" style="white-space:pre-wrap">'+esc(draft)+'</div>'+
+    '<div class="actionbar"><button class="btn primary" '+(locked?'':'disabled')+' onclick="Workbench.toast(\'草稿已采纳（人工外发 · draft_only）· audit +1\',\'ok\')">📋 采纳草稿（人工外发）</button>'+
+    '<button class="btn" onclick="Workbench.runDraft()">↻ 重新起草</button>'+
+    '<span class="tag" style="margin-left:auto">can_send: '+(locked?'true':'false')+'</span></div>';
+}
+
+function renderHistPane(m){
+  var p=$('#pane-hist');
+  var rows=[
+    ['09-16','PO 确认回复','订单 P88-99 已确认 · 提前付款','ok'],
+    ['09-12','二次询价','#A07 法兰 300 件交换比价','ok'],
+    ['09-08','DFM 咨询','轴类壁厚 1.2mm 风险提示 · 已判重做','warn'],
+    ['09-02','质量事件','表面发黑花斑 · 返工 2 批 · postmortem 已入库','warn'],
+    ['08-27','框架续签','年量 1200 件 · 价格联动条款','ok'],
+    ['08-15','首单交付','FR-01 准时率 100% · AQL 0 拒收','ok']
+  ];
+  var h='<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">'+
+    '<span class="col-title" style="letter-spacing:1px">30 天客户历史 · '+(m?esc(m.ctx.split(' · ')[0]):'未绑定')+'</span>'+
+    '<span class="tag mut" style="margin-left:auto">RAG: 3 案例 · postmortem: 1</span></div><div class="tl">';
+  rows.forEach(function(r){ h+='<div class="tl-item '+r[3]+'"><div class="t1"><span class="mono" style="color:var(--acc)">'+r[0]+'</span><b>'+r[1]+'</b></div><div class="t2">'+r[2]+'</div></div>'; });
+  p.innerHTML=h+'</div>';
+}
+
+function renderApprovalPane(m){
+  var p=$('#pane-approval'); var q=state.quote, g=state.gate;
+  var h='<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">'+
+    '<span class="col-title" style="letter-spacing:1px">决策面 · 证据链</span>'+
+    '<span class="tag mut" style="margin-left:auto">batch: '+sha('batch-a11')+'</span></div>';
+  if(!m){ p.innerHTML=h+'<div style="padding:24px;color:var(--ink3);text-align:center">← 绑定邮件后生成证据链</div>'; return; }
+  h+='<div class="evchain">'+
+    '<div class="evrow"><span class="evk">① 候选解析</span><span class="evv">S355JR · DN100 PN16 · 1200 pcs · 发黑 · FOB 上海</span><span class="evs tag ok">parse_rfq ✓</span></div>'+
+    '<div class="evrow"><span class="evk">② RAG 搜索</span><span class="evv">命中 3 条：同法兰去年价 / 质损 postmortem / 客户账期</span><span class="evs tag blue">3 hits</span></div>'+
+    '<div class="evrow"><span class="evk">③ STEP 锁定</span><span class="evv mono">DIN2527-2023_A11.step → sha256 '+sha('step-a11')+'…</span><span class="evs tag acc">sha 🔒</span></div>'+
+    '<div class="evrow"><span class="evk">④ 报价引擎</span><span class="evv">'+(q?'总额 <b style="color:var(--acc)">'+q.total+'</b> · 4 项 · 锁 '+q.sha:'未运行')+'</span><span class="evs '+(q?'tag acc':'tag mut')+'">'+(q?'deterministic':'…')+'</span></div>'+
+    '<div class="evrow"><span class="evk">⑤ 门禁</span><span class="evv">'+(g?(g.fail?'<b style="color:var(--err)">'+g.fail+'</b> → 需 HITL':'5/5 通过 → 可批准'):'未运行')+'</span><span class="evs '+(g?(g.fail?'tag err':'tag ok'):'tag mut')+'">'+(g?(g.fail?'FAIL':'PASS'):'…')+'</span></div>'+
+    '<div class="evrow"><span class="evk">⑥ 事后分析</span><span class="evv">postmortem 关联 1 条 · 无雷同风险</span><span class="evs tag">await</span></div></div>';
+  var canApprove = !!(q&&g&&!g.fail&&!state.approved);
+  h+='<div class="actionbar">'+
+    '<button class="btn primary" '+(canApprove?'':'disabled')+' onclick="Workbench.runApprove()">✅ 批准（双确认）</button>'+
+    '<button class="btn danger" '+(q&&g&&!state.approved?'':'disabled')+' onclick="Workbench.toast(\'已拒绝 → 通知供应商重报\')">✕ 拒绝</button>'+
+    '<button class="btn" onclick="Workbench.toast(\'已请求更多信息（RAG 补查）\')">… 更多信息</button>'+
+    '<button class="btn" onclick="Workbench.toast(\'已转人工 → HITL ticket\')">↪ 转人工</button></div>';
+  if(state.approved){
+    h+='<div class="hitl-banner" style="border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.06)"><div class="hitl-ico">✅</div>'+
+      '<div><div class="hitl-title" style="color:var(--ok)">已批准 · dispatch_id '+sha('ap-a11-'+Date.now())+'</div>'+
+      '<div style="font-size:11px;color:var(--ink3)">audit jsonl +1 · 通知已入 SendQueue</div></div></div>';
+  }
+  p.innerHTML=h;
+  if(m) mountGeo();
+}
+
+function mountGeo(){
+  if(document.getElementById('geoBox')) return; // 已挂载则不重复
+  // geo 挂载到 approval pane 尾部
+  var holder=el('div'); holder.id='geoBox'; holder.dataset.mounted='1';
+  holder.innerHTML='<div id="geo3d"><div class="geo-title">🧊 几何预览 · <span class="mono" style="color:var(--acc)">DIN2527-2023 A11</span> · render_thumbnail</div>'+
+    '<svg viewBox="0 0 320 240"><defs><linearGradient id="g3d" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2A3B50"/><stop offset="1" stop-color="#0F1720"/></linearGradient></defs>'+
+    '<g id="geo-g"><ellipse cx="160" cy="128" rx="118" ry="66" fill="url(#g3d)" stroke="#4E7A0B" stroke-width="1.4"/>'+
+    '<ellipse cx="160" cy="104" rx="70" ry="38" fill="none" stroke="#76B900" stroke-width="1" opacity=".75"/>'+
+    '<circle cx="160" cy="122" r="14" fill="none" stroke="#76B900" stroke-width="1" stroke-dasharray="3 3"/>'+
+    '<line x1="160" y1="104" x2="160" y2="128" stroke="#26323E" stroke-width="1"/><circle cx="160" cy="128" r="2.2" fill="#76B900"/></g></svg>'+
+    '<span class="geo-label" style="top:136px;left:48px">OD φ172</span>'+
+    '<span class="geo-label" style="top:52px;left:196px">t 18</span>'+
+    '<span class="geo-label" style="top:170px;left:138px">8×φ13</span>'+
+    '<div style="position:absolute;bottom:8px;left:10px;display:flex;gap:14px;font-size:10px;color:var(--ink2)">'+
+    '<span>体积 <b class="mono" style="color:var(--acc)">1.24e-4 m³</b></span>'+
+    '<span>质量 <b class="mono" style="color:var(--acc)">0.97 kg</b></span>'+
+    '<span>利用率 <b class="mono" style="color:var(--acc)">78%</b></span>'+
+    '<span style="color:var(--ink3)">× 1200 pcs</span></div></div>';
+  $('#pane-approval').appendChild(holder);
+  var g=document.getElementById('geo-g'), t=0;
+  setInterval(function(){ t+=0.006; if(g) g.setAttribute('transform','translate(0 '+Math.sin(t)*2+') rotate('+(Math.sin(t*0.7)*1.5)+' 160 128)'); },60);
+}
+
+function renderHitlPane(m){
+  var p=$('#pane-hitl'); var g=state.gate;
+  if(!m){ p.innerHTML='<div style="padding:30px;color:var(--ink3);text-align:center">← 绑定邮件查看 HITL 上下文</div>'; return; }
+  p.innerHTML='<div class="hitl-banner"><div class="hitl-ico">🛡</div><div>'+
+    '<div class="hitl-title">'+(g&&g.fail?'门禁失败 · 需要人工裁决':'HITL 待处理 · 风险评分 0.72')+'</div>'+
+    '<div style="font-size:11px;color:var(--ink2);margin-top:2px">'+esc(m.subject)+'</div>'+
+    '<div style="font-size:11px;color:var(--ink3);margin-top:2px">触发: hitl-required.yaml · verify_gate conflicts=1 · 责任: 业务员署名</div></div></div>'+
+    '<div style="display:flex;gap:8px"><span class="tag warn">reasons: 1</span><span class="tag warn">conflicts: 1</span><span class="tag mut">risk_score: 0.72</span>'+
+    '<span class="tag acc" style="cursor:pointer" onclick="Workbench.toast(\'hitl_explain：共面度 0.06 超差，首件 FAI 历史 1 例同源\')">🤔 为什么需要 HITL</span></div>'+
+    '<div style="margin-top:14px"><div class="kvrow"><span class="k">决策 A</span><span>返工喷砂（+3 天 · +¥0.4/pc）</span></div>'+
+    '<div class="kvrow"><span class="k">决策 B</span><span>折价接收（-2.5%）· 索赔窗口 18:00 关闭</span></div></div>'+
+    '<div class="actionbar"><button class="btn primary" onclick="Workbench.toast(\'决策 A 已执行 → HITL 关闭 · 黄金链继续\')">执行 A · 返工</button>'+
+    '<button class="btn" onclick="Workbench.toast(\'决策 B 已提交 → 商务确认\')">执行 B · 折价</button></div>';
+}
+
+/* ============ 右栏 ============ */
+function renderChat(){
+  var thread=$('#chatThread'); thread.innerHTML='';
+  state.messages.forEach(function(mm){
+    var wrap=el('div','msg '+(mm.role==='user'?'user':(mm.role==='sys'?'sys':'agent')));
+    if(mm.role==='sys'){
+      wrap.innerHTML='<span class="tag mut">'+esc(mm.text)+'</span>';
+    } else if(mm.role==='user'){
+      wrap.innerHTML='<div class="who">你 · '+mm.time+'</div><div class="bubble">'+esc(mm.text)+'</div>';
+    } else {
+      var h='<div class="who"><span class="tag blue">Agent</span><span class="mono" style="color:var(--ink3)">'+mm.time+'</span></div><div class="bubble agent-bubble">'+mm.html;
+      if(mm.skills&&mm.skills.length){ h+='<div class="skill-strip">'; mm.skills.forEach(function(s){ h+='<span class="skill-chip">🔧 '+s+' ✓</span>'; }); h+='</div>'; }
+      if(mm.cites&&mm.cites.length){ h+='<div class="cite-wrap">'; mm.cites.forEach(function(c){ h+='<span class="cite-chip" onclick="Workbench.jumpCite(\''+c.k+'\',\''+c.key+'\')">📎 '+c.key+'</span>'; }); h+='</div>'; }
+      if(mm.trace){ h+='<details class="trace-det"><summary>🔬 trace · dispatch_id '+mm.dispatch+'</summary><pre>'+esc(JSON.stringify(mm.trace,null,2))+'</pre></details>'; }
+      h+='</div>';
+      wrap.innerHTML=h;
+    }
+    thread.appendChild(wrap);
+  });
+  thread.scrollTop=thread.scrollHeight;
+}
+
+function renderConsole(){
+  var box=$('#skillConsole'); box.innerHTML='';
+  var groups=[]; SKILLS.forEach(function(s){ if(groups.indexOf(s.g)<0) groups.push(s.g); });
+  groups.forEach(function(g){
+    var gh=el('div','sk-group'); gh.textContent=g; box.appendChild(gh);
+    SKILLS.filter(function(s){return s.g===g;}).forEach(function(s){
+      var it=el('div','sk-item');
+      it.innerHTML='<span class="sk-ico">'+s.ico+'</span>'+
+        '<div style="flex:1;min-width:0"><div class="sk-name">'+s.name+' <span class="sk-id">'+s.id+'</span></div>'+
+        '<div class="sk-desc">'+s.desc+'</div></div>'+
+        '<div class="sk-meta"><span class="tag '+(s.iron.indexOf('🔒')>=0||s.iron==='hitl_required'?'warn':'mut')+'">'+s.iron+'</span><span class="sk-run">▶</span></div>';
+      it.onclick=function(){ runSkill(s.id); };
+      box.appendChild(it);
+    });
+  });
+}
+
+/* ============ Chat 逻辑 ============ */
+function writeSys(t){ state.messages.push({role:'sys',text:t}); renderChat(); }
+function msgUser(t){ state.messages.push({role:'user',text:t,time:nowT()}); renderChat(); }
+function msgAgent(html,skills,cites,trace){
+  state.messages.push({role:'agent',html:html,skills:skills||[],cites:cites||[],trace:trace||null,dispatch:sha('d-'+Date.now()),time:nowT()});
+  renderChat();
+}
+function send(){
+  var ta=$('#chatTa'), v=ta.value.trim();
+  if(!v) return;
+  msgUser(v); ta.value='';
+  chatCmd(v);
+}
+function chatCmd(cmd){
+  var c=cmd.toLowerCase();
+  if(c.indexOf('门禁')>=0||c.indexOf('verify')>=0||c.indexOf('gate')>=0) return runVerify();
+  if(c.indexOf('报价')>=0||c.indexOf('quote')>=0) return runQuote();
+  if(c.indexOf('dfm')>=0||c.indexOf('冲突')>=0) return runDfm();
+  if(c.indexOf('草稿')>=0||c.indexOf('回复')>=0||c.indexOf('draft')>=0) return runDraft();
+  if(c.indexOf('rag')>=0||c.indexOf('历史')>=0||c.indexOf('经验')>=0) return runRag();
+  if(c.indexOf('批准')>=0||c.indexOf('approve')>=0||c.indexOf('确认')>=0) return runApprove();
+  if(c.indexOf('黄金')>=0||c.indexOf('golden')>=0) return runGolden();
+  if(c.indexOf('审计')>=0||c.indexOf('audit')>=0) return chatAudit();
+  if(c.indexOf('skill')>=0||c.indexOf('技能')>=0||c.indexOf('console')>=0) return toggleChatMode('console');
+  setTimeout(function(){
+    msgAgent('意图「'+esc(cmd)+'」未匹配归属 skill，按 <span class="tag">_RULE_ROUTES</span> 回退。<br>可试：<b>跑门禁 / 算报价 / 查 DFM / 起草回复 / 跑黄金链</b>',
+      ['chat_understand'],[{k:'rag',key:'fallback·rule_routes'}],{intent:'unknown',fallback:'_RULE_ROUTES'});
+  },260);
+}
+
+function runVerify(){
+  if(!cur()){ writeSys('先绑一封邮件（左栏）再跑门禁'); return; }
+  setTimeout(function(){
+    var fail = Math.random()<0.3;
+    state.gate = fail
+      ? { fail:'共面度 0.06 超差 (ISO 1101)' }
+      : { fail:null };
+    GC.forEach(function(s,i){ s.active=false; s.flag=false; s.done = i<5; });
+    if(fail){ GC[5].flag=true; } else { GC[5].done=true; GC[6].active=true; }
+    renderGC(); renderPanes();
+    if(fail){
+      msgAgent('🛡 门禁 <b style="color:var(--err)">FAIL</b> — <b>'+state.gate.fail+'</b><br>5 项中 4 项通过，1 项冲突 → 转 HITL 人工裁决。',
+        ['verify_gate','hitl_explain'],[{k:'geometry',key:'STEP-A11 sha 校验'}],{steps:5,violations:1,hitl_required:true});
+      switchInspectTab('hitl');
+    } else {
+      msgAgent('🛡 门禁 <b style="color:var(--ok)">5/5 PASS</b> — 报价锁定 sha 已校验，可以批准。',
+        ['verify_gate'],[{k:'geometry',key:'STEP-A11 sha 校验'}],{steps:5,all_pass:true});
+      switchInspectTab('approval');
+    }
+  },550);
+}
+
+function runQuote(){
+  if(!cur()){ writeSys('先绑一封邮件（左栏）再算报价'); return; }
+  setTimeout(function(){
+    state.quote={ id:'Q-A11', total:'¥ 128,640.00', sha:sha('quote-Q-A11'), unit:'¥ 107.20 / pc' };
+    GC[4].done=true; GC[4].sha=state.quote.sha.slice(0,8);
+    renderGC(); renderPanes();
+    msgAgent('💰 报价 <b style="color:var(--acc)">¥ 128,640.00</b>（含 31.4% 毛利 · 1200 pcs）<br>确定性引擎计算并 <span class="mono" style="color:var(--acc)">LOCK '+state.quote.sha+'</span>，LLM 无权改写价格字段（铁律①）。',
+      ['parse_rfq','extract_specs','calc_quote'],[{k:'geometry',key:'DIN2527-2023_A11.step'}],
+      {total:'128640.00',sha:state.quote.sha,engine:'deterministic',llm_authority:false});
+    switchInspectTab('approval');
+  },700);
+}
+
+function runDfm(){
+  if(!cur()){ writeSys('先绑定邮件再跑 DFM'); return; }
+  msgAgent('🔍 DFM 检查：<b>板厚 18mm 无薄壁风险</b>；注意 8×φ13 孔距 φ124 与密封面共面度要求 <b>0.05</b>，验收时以 CMM 复测。',
+    ['check_dfm','render_thumbnail'],[{k:'geometry',key:'DIN2527-2023_A11.step'},{k:'rag',key:'同款 2025 年档'}],
+    {guards:['min_wall 8mm','hole_clearance ok'],warnings:['coplanarity 0.06 pending']});
+  switchInspectTab('approval');
+  gotoGeo();
+}
+
+function runRag(){
+  msgAgent('📚 RAG 召回 3 条：<br>1) <b>同法兰 2025-08</b> 成交 ¥ 105.6/pc（毛利 29%）<br>2) postmortem：发黑花斑 → 返工 2 批（教训已入库）<br>3) 客户账期 60 天 · 准时付款 100%',
+    ['rag_recall','context_lookup'],[{k:'rag',key:'3 案例折叠'}],{recall_cost_ms:134,sources:['crm_history','postmortem','rag_index']});
+}
+
+function runDraft(){
+  if(!cur()){ writeSys('先绑定邮件'); return; }
+  setTimeout(function(){
+    if(!state.quote){ state.quote={ id:'Q-A11', total:'¥ 128,640.00', sha:sha('quote-Q-A11') }; }
+    msgAgent('📝 草稿已生成（suggest_reply）：<br>“Dear Sir, 随附修订报价单与 DFM 意见，确认后请回 PO，我们即刻锁定产能。”<br><span class="tag acc">locked · sha16 ✓</span>',
+      ['suggest_reply','write_reply'],[{k:'draft',key:'draft #D-A11'}],{locked:true,can_send:true});
+    switchInspectTab('draft');
+  },380);
+}
+
+function runApprove(){
+  if(!cur()){ writeSys('先绑定邮件'); return; }
+  if(!state.quote||!state.gate){ writeSys('先跑完 算报价 + 跑门禁 再批准'); return; }
+  if(state.gate.fail){ writeSys('门禁 FAIL：禁止批准 → 走 HITL'); return; }
+  if(state.approved){ writeSys('本批已批准过（幂等）'); return; }
+  if(!state.pendingApprove){
+    state.pendingApprove=true;
+    writeSys('双确认：再次点击「批准」以提交（展示 sha16 锁）');
+    setTimeout(function(){ state.pendingApprove=false; },6000);
+    return;
+  }
+  state.approved=true; state.pendingApprove=false;
+  renderPanes();
+  msgAgent('✅ <b>已批准</b> — dispatch_id <span class="mono">'+sha('ap-a11-'+Date.now())+'</span><br>audit jsonl +1 · 通知已入 SendQueue · PO 状态 → confirmed',
+    ['approve_gate'],[{k:'geometry',key:'STEP-A11 sha 校验'}],{approve_sha:sha('gate-A11'),double_confirm:true});
+}
+
+function runGolden(){
+  msgAgent('🔗 黄金链 <b>一键执行</b>：INTAKE → PARSE_RFQ → EXTRACT → DFM → <span class="tag acc">CALC_QUOTE sha:ab12</span> → VERIFY → APPROVE → POST<br><span class="tag ok">7/7 · 审计已落</span>',
+    ['golden_chain','audit_tail'],[{k:'rag',key:'全链 trace'}],
+    {chain:['INTAKE','PARSE_RFQ','EXTRACT','DFM','CALC_QUOTE','VERIFY','APPROVE','POST'],audit:1});
+  GC.forEach(function(s){ s.done=true; s.flag=false; s.active=false; });
+  renderGC();
+}
+
+function chatAudit(){
+  msgAgent('📜 最近审计（5 条）：<br><span class="mono">1. '+(function(){return nowT();})()+' dispatch:ab12 verify_gate ✓<br>2. '+ (function(){var d=new Date();return (d.getHours())+':41';})()+' dispatch:ab11 calc_quote ✓<br>3. 09:40 dispatch:ab10 parse_rfq ✓<br>4. 09:12 dispatch:a911 hitl_explain ✓<br>5. 09:11 dispatch:a910 rag_recall ✓</span><br><span class="tag mut">source: skill_audit.jsonl</span>',
+    ['audit_tail'],[{k:'rag',key:'audit=jsonl'}],{limit:5});
+}
+
+function gotoGeo(){
+  var b=document.getElementById('geoBox');
+  if(b){ b.scrollIntoView({behavior:'smooth',block:'center'});
+    b.style.boxShadow='0 0 0 2px var(--acc)'; setTimeout(function(){ b.style.boxShadow=''; },1200);
+  }
+  toast('highlightRegion: 几何预览');
+}
+
+/* ============ 交互 ============ */
+function openMail(id){
+  state.curMailId=id;
+  state.quote=null; state.gate=null; state.approved=false; state.pendingApprove=false;
+  GC.forEach(function(s,i){ s.done=(i<4); s.active=false; s.flag=false; s.sha = (i===4)?undefined:s.sha; });
+  $('#boundTag').textContent='bound '+id; $('#boundTag').className='tag acc';
+  $('#ctxPill').style.display=''; $('#ctxPill').textContent='🗂 8 区已聚合';
+  writeSys('session 绑定 '+id+' · bound_context_id=8 区聚合 · chat_sessions jsonl +1');
+  renderMailList(); renderPanes(); renderGC();
+  switchInspectTab('mail');
+  var m=cur();
+  if(m){
+    msgAgent('已接收 <b>'+esc(m.subject)+'</b>。<br>建议动作：<b>算报价</b>（含图纸）· <b>跑门禁</b> · <b>起草回复</b>',
+      ['parse_rfq','extract_specs','context_lookup'],
+      [{k:'geometry',key:'DIN2527-2023_A11.step'},{k:'rag',key:'3 案例 · 同法兰'}],
+      {intent:'inbox_open',slots:{deliverable:'quote+dfm'},rules:['deterministic']});
+  }
+}
+
+function jumpCite(kind,key){
+  toast('jumpCite → 中栏 '+kind.toUpperCase()+' · '+key);
+  switchInspectTab(kind==='geometry'||kind==='rag'?'approval':(kind==='draft'?'draft':'approval'));
+  if(kind==='geometry'||kind==='rag') gotoGeo();
+}
+function switchInspectTab(tab){
+  var tabs=['mail','draft','hist','approval','hitl'];
+  tabs.forEach(function(t){
+    var b=document.querySelector('.insp-tab[data-tab="'+t+'"]');
+    var p=document.getElementById('pane-'+t);
+    if(b) b.classList.toggle('active',t===tab);
+    if(p) p.classList.toggle('active',t===tab);
+  });
+}
+function toggleChatMode(md){
+  state.chatMode=md;
+  document.querySelectorAll('.st-seg button').forEach(function(b){ b.classList.toggle('active',b.dataset.m===md); });
+  $('#chatThread').classList.toggle('hidden',md!=='chat');
+  $('#skillConsole').classList.toggle('hidden',md!=='console');
+}
+
+/* ---------- Command Palette ---------- */
+var PALETTE=[
+  {l:'🛡 跑门禁 verify_gate',k:'G',act:runVerify},
+  {l:'💰 算报价 calc_quote',k:'Q',act:runQuote},
+  {l:'✅ 批准（双确认）approve_gate',k:'A',act:runApprove},
+  {l:'🔍 查 DFM 冲突',k:'D',act:runDfm},
+  {l:'📚 查历史经验 RAG',k:'R',act:runRag},
+  {l:'📝 起草回复',k:'W',act:runDraft},
+  {l:'🔗 跑黄金链 golden_chain',k:'C',act:runGolden},
+  {l:'📜 看最近审计',k:'L',act:chatAudit},
+  {l:'打开 Skill Console',k:'S',act:function(){ toggleChatMode('console'); }},
+  {l:'打开 3D 预览',k:'3',act:gotoGeo}
+];
+function openPalette(){
+  $('#palette').classList.add('show');
+  renderPal(''); setTimeout(function(){ $('#palInput').focus(); },30);
+}
+function renderPal(kw){
+  var box=$('#palList'); box.innerHTML='';
+  PALETTE.forEach(function(p,i){
+    if(kw && p.l.toLowerCase().indexOf(kw.toLowerCase())<0) return;
+    var it=el('div','pal-item'+(i===0?' sel':''));
+    it.innerHTML='<span class="pl">'+p.l+'</span><span class="pk">'+p.k+'</span>';
+    it.onclick=function(){ $('#palette').classList.remove('show'); p.act(); };
+    box.appendChild(it);
+  });
+}
+
+/* ---------- toast ---------- */
+var toastBox=null;
+function toast(t){
+  if(!toastBox){
+    toastBox=el('div');
+    toastBox.style.cssText='position:fixed;bottom:44px;left:50%;transform:translateX(-50%);background:#16201A;border:1px solid var(--accdim);color:var(--acc);font-family:var(--mono);font-size:12px;padding:8px 16px;border-radius:4px;z-index:99;box-shadow:0 8px 30px rgba(0,0,0,.5)';
+    document.body.appendChild(toastBox);
+  }
+  toastBox.textContent='· '+t;
+  toastBox.style.opacity=1;
+  clearTimeout(toastBox._t);
+  toastBox._t=setTimeout(function(){ toastBox.style.opacity=0; },2600);
+}
+
+/* ---------- 事件 ---------- */
+function runSkill(sid){
+  var map={ calc_quote:runQuote, verify_gate:runVerify, suggest_reply:runDraft, approve_gate:runApprove,
+    check_dfm:runDfm, golden_chain:runGolden, rag_recall:runRag, audit_tail:chatAudit };
+  if(map[sid]) map[sid](); else toast('已调用 '+sid+'（mock 成功 → audit +1）');
+}
+
+function bind(){
+  $('#mailSearch').addEventListener('input',function(e){ state.search=e.target.value; renderMailList(); });
+  $('#mailFilter').addEventListener('change',function(e){ state.filter=e.target.value; renderMailList(); });
+  $('#chatTa').addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); } });
+  $('#palInput').addEventListener('input',function(e){ renderPal(e.target.value); });
+  $('#palInput').addEventListener('keydown',function(e){ if(e.key==='Enter'){ var s=$('#palList .sel'); if(s) s.click(); } });
+  $('#palette').addEventListener('click',function(e){ if(e.target.id==='palette') $('#palette').classList.remove('show'); });
+  document.querySelectorAll('.tabnav').forEach(function(b){
+    b.addEventListener('click',function(){ if(b.textContent.indexOf('工作台')>=0) return; toast(b.textContent.trim()+' tab（v4.0.0 已折叠为工作台三栏）'); });
+  });
+  document.addEventListener('keydown',function(e){
+    var pal=$('#palette');
+    if(e.key==='Escape'){ pal.classList.remove('show'); return; }
+    if((e.ctrlKey||e.metaKey)&&e.key==='k'){ e.preventDefault(); openPalette(); return; }
+    if((e.ctrlKey||e.metaKey)&&/^[1-5]$/.test(e.key)){ e.preventDefault(); switchInspectTab(['mail','draft','hist','approval','hitl'][+e.key-1]); return; }
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='b'){ e.preventDefault(); document.activeElement===$('#chatTa')?$('#mailSearch').focus():$('#chatTa').focus(); return; }
+    if(pal.classList.contains('show')){
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+        e.preventDefault();
+        var items=[].slice.call($('#palList').children);
+        var idx=items.findIndex(function(x){return x.classList.contains('sel');});
+        idx=(idx+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;
+        items.forEach(function(x,i){ x.classList.toggle('sel',i===idx); });
+      }
+    }
+  });
+}
+
+function init(){
+  state.mails=[].concat(M);
+  state.curMailId='M-2201';
+  GC[0].done=GC[1].done=GC[2].done=GC[3].done=true;
+  renderMailList(); renderPanes(); renderGC(); renderConsole();
+  $('#boundTag').textContent='bound M-2201'; $('#boundTag').className='tag acc';
+  $('#ctxPill').style.display=''; $('#ctxPill').textContent='🗂 8 区已聚合';
+  writeSys('session 绑定 M-2201 · 8 区已聚合 · PRIOR 0 · audit 12');
+  var m=cur();
+  if(m){
+    msgAgent('收到 <b>'+esc(m.subject)+'</b>（新询盘）。<br>建议：<b>算报价</b> → <b>跑门禁</b> → <b>起草回复</b>，或直接 @我 “跑黄金链”。',
+      ['parse_rfq','extract_specs'],[{k:'geometry',key:'DIN2527-2023_A11.step'},{k:'rag',key:'同法兰 2025 年档'}],
+      {intent:'rfq_new',slots:{material:'S355JR',qty:1200,delivery:'2026-10-15'}});
+  }
+  var chips=[['🛡 跑门禁','verify_gate'],['💰 算报价','calc_quote'],['🔍 查 DFM','check_dfm'],['📝 起草回复','suggest_reply'],['🔗 跑黄金链','golden_chain']];
+  var box=$('#quickChips');
+  chips.forEach(function(c){
+    var b=el('button','tag acc'); b.style.cursor='pointer'; b.textContent=c[0];
+    b.onclick=function(){ msgUser(c[0]); setTimeout(function(){ runSkill(c[1]); },60); };
+    box.appendChild(b);
+  });
+}
+
+/* ---------- 公开 API ---------- */
+window.Workbench={
+  refresh:renderMailList,
+  send:send,
+  openPalette:openPalette,
+  switchInspectTab:switchInspectTab,
+  toggleChatMode:toggleChatMode,
+  jumpCite:jumpCite,
+  runApprove:runApprove,
+  runDraft:runDraft,
+  runDfm:runDfm,
+  toast:toast
+};
+
+if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded',function(){ bind(); init(); }); }
+else { bind(); init(); }
+
+})();
+</script>
+</body>
+</html>

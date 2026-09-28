@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Union Export Agent · v3.0 Gmail 工作台集成架构</title>
+<style>
+  :root{
+    --ink:#0B1020; --ink2:#151B2E; --panel:#1C2440; --line:#2A3352;
+    --tx:#E6EBFF; --mut:#8B96B8;
+    --paper:#E9EEF4; --paper2:#F7F9FC; --steel:#D5DEE8; --rule:#8FA0B3;
+    --acc:#0F766E; --acc-soft:#D5F0EC;          /* NEW */
+    --admin:#4F46E5; --admin-soft:#EEF2FF;      /* existing console */
+    --ok:#22C55E; --hitl:#F59E0B; --block:#EF4444;
+    --lock:#B45309;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--paper); color:#15202B;
+    font:14px/1.55 "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  }
+  header{
+    background:var(--ink); color:var(--tx); padding:18px 24px;
+    border-bottom:3px solid var(--acc);
+  }
+  header h1{margin:0;font-size:20px;letter-spacing:.3px}
+  header .sub{color:var(--mut);font-size:12px;margin-top:6px}
+  main{max-width:1200px;margin:0 auto;padding:24px}
+  h2{font-size:16px;margin:28px 0 12px;color:#15202B}
+  h2 .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;margin-left:8px;vertical-align:middle}
+  h2 .tag.new{background:var(--acc-soft);color:var(--acc);border:1px solid var(--acc)}
+  h2 .tag.ex{background:var(--admin-soft);color:var(--admin);border:1px solid var(--admin)}
+  .card{
+    background:var(--paper2);border:1px solid var(--steel);border-radius:12px;
+    padding:16px;margin-bottom:14px;
+  }
+  .grid4{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+  .pillar{
+    background:#fff;border:1px solid var(--steel);border-left:4px solid var(--acc);
+    border-radius:10px;padding:14px;
+  }
+  .pillar h3{margin:0 0 6px;font-size:14px}
+  .pillar h3 .pno{color:var(--acc);font-family:Consolas,monospace;margin-right:6px}
+  .pillar p{margin:0 0 8px;font-size:12px;color:#5B6B7C;line-height:1.5}
+  .pillar code{font-family:Consolas,ui-monospace,monospace;font-size:11px;background:#E9EEF4;padding:1px 5px;border-radius:3px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#5B6B7C;margin:8px 0 16px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:14px;height:14px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.08)}
+  .diagram-wrap{
+    background:var(--ink);border-radius:12px;padding:12px;overflow:auto;
+  }
+  .diagram-wrap svg{display:block;width:100%;height:auto;min-width:900px}
+  table{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border:1px solid var(--steel);border-radius:8px;overflow:hidden}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--steel)}
+  th{background:#DCE5EF;color:#5B6B7C;font-weight:600;font-size:11px}
+  tr:last-child td{border-bottom:0}
+  .ok{color:#15803D;font-weight:600}
+  .miss{color:#B45309;font-weight:600}
+  .out{color:#5B6B7C}
+  .flow{
+    display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;
+  }
+  .flow .node{
+    background:#fff;border:1px solid var(--steel);border-radius:6px;padding:6px 10px;
+  }
+  .flow .node.new{border-color:var(--acc);background:var(--acc-soft);color:var(--acc);font-weight:600}
+  .flow .arr{color:var(--rule);font-weight:700}
+  footer{
+    max-width:1200px;margin:0 auto;padding:12px 24px 32px;
+    font-size:11px;color:#5B6B7C;
+  }
+  @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Union Export Agent · v3.0 Gmail 工作台集成架构</h1>
+  <div class="sub">
+    参考图 · Q1.1 覆盖核对 · 凭代码（mailbox_api / skills / openshell / webui tab-mailbox）
+    · 铁律①：IMAP/OAuth 默认禁 · draft_only · DETERMINISTIC 不走 LLM
+  </div>
+</header>
+<main>
+
+  <div class="legend">
+    <span><i class="sw" style="background:#0F766E"></i> ★ NEW 本轮增量（4 Pillar）</span>
+    <span><i class="sw" style="background:#4F46E5"></i> 已有子系统（保留接入）</span>
+    <span><i class="sw" style="background:#8B96B8"></i> 引擎 / 数据</span>
+    <span><i class="sw" style="background:#B45309"></i> 铁律①锁定点</span>
+    <span><i class="sw" style="background:#F59E0B"></i> HITL 人工门</span>
+  </div>
+
+  <h2>集成总览 <span class="tag new">Architecture</span></h2>
+  <div class="diagram-wrap" role="img" aria-label="v3.0 Gmail 工作台四层集成架构图">
+    <svg viewBox="0 0 1160 780" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif">
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6" fill="none" stroke="#8FA0B3" stroke-width="1"/>
+        </marker>
+        <marker id="arrNew" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6" fill="none" stroke="#0F766E" stroke-width="1.2"/>
+        </marker>
+      </defs>
+
+      <!-- background -->
+      <rect width="1160" height="780" fill="#0B1020"/>
+
+      <!-- LAYER 1 UI -->
+      <rect x="24" y="24" width="1112" height="150" rx="10" fill="#151B2E" stroke="#2A3352"/>
+      <text x="40" y="48" fill="#8B96B8" font-size="11" font-weight="600">L1 · UI — webui/index.html</text>
+
+      <rect x="40" y="62" width="160" height="44" rx="8" fill="#1C2440" stroke="#2A3352"/>
+      <text x="120" y="82" fill="#E6EBFF" font-size="12" text-anchor="middle">models / demo</text>
+      <text x="120" y="98" fill="#8B96B8" font-size="10" text-anchor="middle">运维 / 演示</text>
+
+      <rect x="214" y="62" width="160" height="44" rx="8" fill="#1C2440" stroke="#2A3352"/>
+      <text x="294" y="82" fill="#E6EBFF" font-size="12" text-anchor="middle">endpoints / 3D</text>
+      <text x="294" y="98" fill="#8B96B8" font-size="10" text-anchor="middle">上传 / 缩略图</text>
+
+      <rect x="388" y="62" width="150" height="44" rx="8" fill="#1C2440" stroke="#2A3352"/>
+      <text x="463" y="82" fill="#E6EBFF" font-size="12" text-anchor="middle">skills 设置</text>
+      <text x="463" y="98" fill="#8B96B8" font-size="10" text-anchor="middle">OpenShell / Dispatcher</text>
+
+      <rect x="552" y="62" width="200" height="44" rx="8" fill="#0F3D38" stroke="#0F766E" stroke-width="2"/>
+      <text x="652" y="82" fill="#7DD3C7" font-size="12" text-anchor="middle" font-weight="700">★ #tab-mailbox</text>
+      <text x="652" y="98" fill="#A7F3D0" font-size="10" text-anchor="middle">列表 · 详情 · 侧栏 8 区</text>
+
+      <rect x="766" y="62" width="160" height="44" rx="8" fill="#0F3D38" stroke="#0F766E" stroke-width="2"/>
+      <text x="846" y="82" fill="#7DD3C7" font-size="12" text-anchor="middle" font-weight="700">★ #tab-v12</text>
+      <text x="846" y="98" fill="#A7F3D0" font-size="10" text-anchor="middle">Timo v12 内核仪表板</text>
+
+      <rect x="940" y="62" width="176" height="44" rx="8" fill="#3B2F0B" stroke="#F59E0B" stroke-width="2"/>
+      <text x="1028" y="82" fill="#FCD34D" font-size="12" text-anchor="middle" font-weight="700">★ HITL 审批面板</text>
+      <text x="1028" y="98" fill="#FDE68A" font-size="10" text-anchor="middle">verification 内嵌 · 铁律①</text>
+
+      <text x="40" y="140" fill="#8B96B8" font-size="11">侧栏 8 区：customer · geometry · rag · pending · verification★HITL · postmortem · commercial · trace</text>
+      <text x="40" y="158" fill="#0F766E" font-size="11" font-weight="600">★ Pillar 4：双向跨区跳转 Mail.openContext(cid) + mailDetail 上下文面包屑</text>
+
+      <!-- arrows UI -> API -->
+      <line x1="200" y1="174" x2="200" y2="200" stroke="#0F766E" stroke-width="1.2" marker-end="url(#arrNew)"/>
+      <line x1="652" y1="174" x2="652" y2="200" stroke="#0F766E" stroke-width="1.2" marker-end="url(#arrNew)"/>
+      <line x1="846" y1="174" x2="846" y2="200" stroke="#0F766E" stroke-width="1.2" marker-end="url(#arrNew)"/>
+
+      <!-- LAYER 2 API -->
+      <rect x="24" y="204" width="1112" height="118" rx="10" fill="#151B2E" stroke="#2A3352"/>
+      <text x="40" y="228" fill="#8B96B8" font-size="11" font-weight="600">L2 · API — services/api_server.py + routers</text>
+
+      <rect x="40" y="242" width="220" height="60" rx="8" fill="#0F3D38" stroke="#0F766E" stroke-width="2"/>
+      <text x="150" y="264" fill="#7DD3C7" font-size="12" text-anchor="middle" font-weight="700">★ /v1/gmail/*</text>
+      <text x="150" y="282" fill="#A7F3D0" font-size="10" text-anchor="middle">connect · sync · settings</text>
+      <text x="150" y="296" fill="#6EE7B7" font-size="9" text-anchor="middle">imap_tools · App Password</text>
+
+      <rect x="274" y="242" width="250" height="60" rx="8" fill="#1C2440" stroke="#4F46E5"/>
+      <text x="399" y="264" fill="#C7D2FE" font-size="12" text-anchor="middle" font-weight="600">/v1/mail/*</text>
+      <text x="399" y="282" fill="#8B96B8" font-size="10" text-anchor="middle">inbox · detail · context/8区</text>
+      <text x="399" y="296" fill="#8B96B8" font-size="9" text-anchor="middle">mailbox_api.py 已存在</text>
+
+      <rect x="538" y="242" width="200" height="60" rx="8" fill="#0F3D38" stroke="#0F766E" stroke-width="2"/>
+      <text x="638" y="264" fill="#7DD3C7" font-size="12" text-anchor="middle" font-weight="700">★ /v1/v12/*</text>
+      <text x="638" y="282" fill="#A7F3D0" font-size="10" text-anchor="middle">status · audit · dfm</text>
+      <text x="638" y="296" fill="#6EE7B7" font-size="9" text-anchor="middle">services/v12_status.py 新</text>
+
+      <rect x="752" y="242" width="180" height="60" rx="8" fill="#1C2440" stroke="#4F46E5"/>
+      <text x="842" y="264" fill="#C7D2FE" font-size="12" text-anchor="middle" font-weight="600">/v1/rfq/{cid}/*</text>
+      <text x="842" y="282" fill="#8B96B8" font-size="10" text-anchor="middle">analyze quote verify</text>
+      <text x="842" y="296" fill="#8B96B8" font-size="9" text-anchor="middle">approve ← HITL 面板</text>
+
+      <rect x="946" y="242" width="170" height="60" rx="8" fill="#1C2440" stroke="#4F46E5"/>
+      <text x="1031" y="264" fill="#C7D2FE" font-size="12" text-anchor="middle" font-weight="600">agent/skills/models</text>
+      <text x="1031" y="282" fill="#8B96B8" font-size="10" text-anchor="middle">task · route · config</text>
+      <text x="1031" y="296" fill="#8B96B8" font-size="9" text-anchor="middle">NemoClaw 控制面</text>
+
+      <line x1="150" y1="322" x2="150" y2="348" stroke="#0F766E" stroke-width="1.2" marker-end="url(#arrNew)"/>
+      <line x1="399" y1="322" x2="399" y2="348" stroke="#8FA0B3" stroke-width="1" marker-end="url(#arr)"/>
+      <line x1="638" y1="322" x2="638" y2="348" stroke="#0F766E" stroke-width="1.2" marker-end="url(#arrNew)"/>
+      <line x1="842" y1="322" x2="842" y2="348" stroke="#8FA0B3" stroke-width="1" marker-end="url(#arr)"/>
+
+      <!-- LAYER 3 Services -->
+      <rect x="24" y="352" width="1112" height="200" rx="10" fill="#151B2E" stroke="#2A3352"/>
+      <text x="40" y="376" fill="#8B96B8" font-size="11" font-weight="600">L3 · Services — 业务编排 / NemoClaw / 邮件 / 内核状态</text>
+
+      <!-- NEW services -->
+      <rect x="40" y="390" width="200" height="72" rx="8" fill="#0F3D38" stroke="#0F766E" stroke-width="2"/>
+      <text x="140" y="412" fill="#7DD3C7" font-size="12" text-anchor="middle" font-weight="700">★ gmail_imap.py</text>
+      <text x="140" y="430" fill="#A7F3D0" font-size="10" text-anchor="middle">imap_tools → :993</text>
+      <text x="140" y="446" fill="#6EE7B7" font-size="9" text-anchor="middle">默认 OFF · credentials 本地</text>
+
+      <rect x="254" y="390" width="180" height="72" rx="8" fill="#0F3D38" stroke="#0F766E" stroke-width="2"/>
+      <text x="344" y="412" fill="#7DD3C7" font-size="12" text-anchor="middle" font-weight="700">★ v12_status.py</text>
+      <text x="344" y="430" fill="#A7F3D0" font-size="10" text-anchor="middle">内核探活 · 审计 · DFM</text>
+      <text x="344" y="446" fill="#6EE7B7" font-size="9" text-anchor="middle">聚合 Timo v12.0 Fusion</text>
+
+      <rect x="448" y="390" width="200" height="72" rx="8" fill="#0F3D38" stroke="#0F766E" stroke-width="2"/>
+      <text x="548" y="412" fill="#7DD3C7" font-size="12" text-anchor="middle" font-weight="700">★ credentials.py</text>
+      <text x="548" y="430" fill="#A7F3D0" font-size="10" text-anchor="middle">App Password 本地存储</text>
+      <text x="548" y="446" fill="#6EE7B7" font-size="9" text-anchor="middle">data/credentials.json · 0600</text>
+
+      <!-- existing services -->
+      <rect x="662" y="390" width="200" height="72" rx="8" fill="#1C2440" stroke="#4F46E5"/>
+      <text x="762" y="412" fill="#C7D2FE" font-size="12" text-anchor="middle" font-weight="600">mailbox_api.py</text>
+      <text x="762" y="430" fill="#8B96B8" font-size="10" text-anchor="middle">inbox + 8 区聚合</text>
+      <text x="762" y="446" fill="#8B96B8" font-size="9" text-anchor="middle">已挂到 api_server</text>
+
+      <rect x="876" y="390" width="240" height="72" rx="8" fill="#1C2440" stroke="#4F46E5"/>
+      <text x="996" y="412" fill="#C7D2FE" font-size="12" text-anchor="middle" font-weight="600">NemoClaw 控制面</text>
+      <text x="996" y="430" fill="#8B96B8" font-size="10" text-anchor="middle">skill_dispatcher · skill_config</text>
+      <text x="996" y="446" fill="#8B96B8" font-size="9" text-anchor="middle">openshell 4 策略 · iron-rule-1 LOCKED</text>
+
+      <!-- second row services -->
+      <rect x="40" y="476" width="180" height="56" rx="8" fill="#1C2440" stroke="#4F46E5"/>
+      <text x="130" y="498" fill="#C7D2FE" font-size="12" text-anchor="middle">crm_memory</text>
+      <text x="130" y="516" fill="#8B96B8" font-size="10" text-anchor="middle">history · pending_for★规划</text>
+
+      <rect x="234" y="476" width="160" height="56" rx="8" fill="#1C2440" stroke="#4F46E5"/>
+      <text x="314" y="498" fill="#C7D2FE" font-size="12" text-anchor="middle">rag.search</text>
+      <text x="314" y="516" fill="#8B96B8" font-size="10" text-anchor="middle">历史经验 · 显式 _mock</text>
+
+      <rect x="408" y="476" width="180" height="56" rx="8" fill="#1C2440" stroke="#4F46E5"/>
+      <text x="498" y="498" fill="#C7D2FE" font-size="12" text-anchor="middle">reply.build_reply</text>
+      <text x="498" y="516" fill="#8B96B8" font-size="10" text-anchor="middle">draft_only · auto_send=false</text>
+
+      <rect x="602" y="476" width="180" height="56" rx="8" fill="#1C2440" stroke="#4F46E5"/>
+      <text x="692" y="498" fill="#C7D2FE" font-size="12" text-anchor="middle">step_thumbnail</text>
+      <text x="692" y="516" fill="#8B96B8" font-size="10" text-anchor="middle">OCP SVG · sha256 缓存</text>
+
+      <rect x="796" y="476" width="160" height="56" rx="8" fill="#1C2440" stroke="#4F46E5"/>
+      <text x="876" y="498" fill="#C7D2FE" font-size="12" text-anchor="middle">verification</text>
+      <text x="876" y="516" fill="#8B96B8" font-size="10" text-anchor="middle">辟牟援推止 · HITL</text>
+
+      <rect x="970" y="476" width="146" height="56" rx="8" fill="#1C2440" stroke="#2A3352"/>
+      <text x="1043" y="498" fill="#8B96B8" font-size="12" text-anchor="middle">commercial</text>
+      <text x="1043" y="516" fill="#8B96B8" font-size="10" text-anchor="middle">Incoterms · landed</text>
+
+      <line x1="140" y1="552" x2="140" y2="578" stroke="#0F766E" stroke-width="1.2" marker-end="url(#arrNew)"/>
+      <line x1="344" y1="552" x2="344" y2="578" stroke="#0F766E" stroke-width="1.2" marker-end="url(#arrNew)"/>
+      <line x1="548" y1="552" x2="548" y2="578" stroke="#8FA0B3" stroke-width="1" marker-end="url(#arr)"/>
+      <line x1="762" y1="552" x2="762" y2="578" stroke="#8FA0B3" stroke-width="1" marker-end="url(#arr)"/>
+      <line x1="996" y1="552" x2="996" y2="578" stroke="#8FA0B3" stroke-width="1" marker-end="url(#arr)"/>
+
+      <!-- LAYER 4 Engine / Data -->
+      <rect x="24" y="582" width="1112" height="170" rx="10" fill="#151B2E" stroke="#2A3352"/>
+      <text x="40" y="606" fill="#8B96B8" font-size="11" font-weight="600">L4 · Engine / Data — 确定性内核 · 邮件落盘 · 记忆</text>
+
+      <rect x="40" y="620" width="220" height="64" rx="8" fill="#1C2440" stroke="#B45309" stroke-width="2"/>
+      <text x="150" y="644" fill="#FCD34D" font-size="12" text-anchor="middle" font-weight="700">Timo v12.0 Fusion</text>
+      <text x="150" y="662" fill="#FDE68A" font-size="10" text-anchor="middle">:7862 calc_quote + ConflictChecker</text>
+      <text x="150" y="676" fill="#F59E0B" font-size="9" text-anchor="middle">🔒 铁律① · DETERMINISTIC · 不可 A/B</text>
+
+      <rect x="274" y="620" width="200" height="64" rx="8" fill="#1C2440" stroke="#2A3352"/>
+      <text x="374" y="644" fill="#E6EBFF" font-size="12" text-anchor="middle">FunASR 网关</text>
+      <text x="374" y="662" fill="#8B96B8" font-size="10" text-anchor="middle">:8866 ASR · VLM · emb</text>
+      <text x="374" y="676" fill="#8B96B8" font-size="9" text-anchor="middle">离线显式 MOCK</text>
+
+      <rect x="488" y="620" width="200" height="64" rx="8" fill="#0F3D38" stroke="#0F766E" stroke-width="2"/>
+      <text x="588" y="644" fill="#7DD3C7" font-size="12" text-anchor="middle" font-weight="700">★ data/mailbox/</text>
+      <text x="588" y="662" fill="#A7F3D0" font-size="10" text-anchor="middle">IMAP 拉信 → .eml 落盘</text>
+      <text x="588" y="676" fill="#6EE7B7" font-size="9" text-anchor="middle">+ data/credentials.json 本地</text>
+
+      <rect x="702" y="620" width="180" height="64" rx="8" fill="#1C2440" stroke="#2A3352"/>
+      <text x="792" y="644" fill="#E6EBFF" font-size="12" text-anchor="middle">CRM SQLite</text>
+      <text x="792" y="662" fill="#8B96B8" font-size="10" text-anchor="middle">crm.sqlite3 · customers</text>
+      <text x="792" y="676" fill="#8B96B8" font-size="9" text-anchor="middle">rfqs · quotes · postmortems</text>
+
+      <rect x="896" y="620" width="220" height="64" rx="8" fill="#1C2440" stroke="#2A3352"/>
+      <text x="1006" y="644" fill="#E6EBFF" font-size="12" text-anchor="middle">contexts / traces / audit</text>
+      <text x="1006" y="662" fill="#8B96B8" font-size="10" text-anchor="middle">data/contexts · SHA-256 链</text>
+      <text x="1006" y="676" fill="#8B96B8" font-size="9" text-anchor="middle">skill_audit.jsonl · drafts</text>
+
+      <!-- out of scope note -->
+      <rect x="40" y="700" width="1076" height="36" rx="6" fill="#0B1020" stroke="#2A3352" stroke-dasharray="4 3"/>
+      <text x="580" y="722" fill="#8B96B8" font-size="11" text-anchor="middle">不在本轮范围：真 OAuth 流程 · SMTP 自动发信 · 邮件状态机/看板拖拽（与 RFQ 状态机冲突）· supplier_module 履约 UI · 多用户协作</text>
+    </svg>
+  </div>
+
+  <h2>四 Pillar 明细 <span class="tag new">NEW</span></h2>
+  <div class="grid4">
+    <div class="pillar">
+      <h3><span class="pno">P1</span>Gmail 接入</h3>
+      <p>GitHub 库 <code>imap_tools</code>（Apache-2.0）。UI 设置页填 Gmail App Password，<strong>默认禁用</strong>，显式开关后才 sync。</p>
+      <p>新增：<code>services/gmail_imap.py</code> · <code>services/credentials.py</code> · API <code>/v1/gmail/*</code></p>
+      <p>降级：未启用时仍走本地 <code>.eml</code> 上传 / mailbox 目录。</p>
+    </div>
+    <div class="pillar">
+      <h3><span class="pno">P2</span>V12 内核仪表板</h3>
+      <p>新 tab <code>#tab-v12</code>：展示 <code>Timo_CNC-AI-Brain v12.0-Fusion</code> 在线状态、报价吞吐、C1–C6 DFM、sha256 审计链。</p>
+      <p>新增：<code>services/v12_status.py</code> · API <code>/v1/v12/*</code></p>
+      <p>数据源：既有 <code>adapters/timo_adapter.py</code> + audit 文件，不新建内核。</p>
+    </div>
+    <div class="pillar">
+      <h3><span class="pno">P3</span>流程管理 · HITL 面板</h3>
+      <p>在 mailbox 侧栏 <strong>verification 区</strong>内嵌审批 UI：批准 → <code>/v1/rfq/{cid}/approve</code>；打回 → 备注入库。</p>
+      <p>铁律①可视化：报价旁 🔒 + sha256；试图改数字 → 红字拦截（OpenShell）。</p>
+      <p>不做：邮件独立状态机 / Kanban（与 RFQ 状态机冲突）。</p>
+    </div>
+    <div class="pillar">
+      <h3><span class="pno">P4</span>上下文联动</h3>
+      <p>侧栏卡片双向跳转：<code>Mail.openContext(cid)</code> — 待审→HITL 面板；历史 RFQ→对应 context；几何→对应 commercial。</p>
+      <p>mailDetail 顶部<strong>面包屑</strong>：📧 邮件 · 材料×数量 · DFM · quote · HITL 状态。</p>
+      <p>纯前端增量，不改 8 区 API 契约。</p>
+    </div>
+  </div>
+
+  <h2>主数据流（点开一封 Gmail）</h2>
+  <div class="card">
+    <div class="flow">
+      <span class="node new">IMAP sync ★</span><span class="arr">→</span>
+      <span class="node">data/mailbox/*.eml</span><span class="arr">→</span>
+      <span class="node">mailbox_api inbox</span><span class="arr">→</span>
+      <span class="node new">UI mailDetail + 面包屑 ★</span><span class="arr">→</span>
+      <span class="node">8 区 context 并行拉取</span><span class="arr">→</span>
+      <span class="node new">跨区跳转 ★</span>
+    </div>
+    <div class="flow" style="margin-top:10px">
+      <span class="node">verification 区</span><span class="arr">→</span>
+      <span class="node new">HITL 面板 ★ 批准/打回</span><span class="arr">→</span>
+      <span class="node">/v1/rfq/{cid}/approve</span><span class="arr">→</span>
+      <span class="node">状态机 + audit</span>
+    </div>
+    <div class="flow" style="margin-top:10px">
+      <span class="node new">AI 起草 ★</span><span class="arr">→</span>
+      <span class="node">skill_dispatcher</span><span class="arr">→</span>
+      <span class="node">calc_quote 🔒 Timo</span><span class="arr">→</span>
+      <span class="node">reply.build_reply draft_only</span><span class="arr">→</span>
+      <span class="node">data/drafts/ 人工审</span>
+    </div>
+  </div>
+
+  <h2>Q1.1 覆盖核对 <span class="tag ex">既有 vs 新增</span></h2>
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>子系统</th><th>图中位置</th><th>状态</th><th>与 4 Pillar 关系</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>P1 Gmail IMAP</td><td>L1 mailbox + L2 /v1/gmail + L3 gmail_imap</td><td class="miss">NEW</td><td>Pillar 1 主体</td></tr>
+        <tr><td>P2 V12 仪表板</td><td>L1 #tab-v12 + L2 /v1/v12 + L3 v12_status</td><td class="miss">NEW</td><td>Pillar 2 主体</td></tr>
+        <tr><td>P3 HITL 面板</td><td>L1 verification 内嵌 + L2 approve</td><td class="miss">NEW UI</td><td>Pillar 3 主体；后端 approve 已有</td></tr>
+        <tr><td>P4 跨区跳转</td><td>L1 侧栏 + 面包屑</td><td class="miss">NEW UI</td><td>Pillar 4 主体；纯前端</td></tr>
+        <tr><td>webui #tab-mailbox</td><td>L1</td><td class="ok">已有</td><td>列表/详情/侧栏壳已存在</td></tr>
+        <tr><td>mailbox_api 8 区</td><td>L2 /v1/mail/* + L3</td><td class="ok">已有</td><td>P3/P4 挂载点</td></tr>
+        <tr><td>NemoClaw Skills/Dispatcher/OpenShell</td><td>L2 agent/skills + L3</td><td class="ok">已有</td><td>AI 起草与铁律①执行层</td></tr>
+        <tr><td>RAG / CRM / reply / thumbnail / verification</td><td>L3 第二行</td><td class="ok">已有</td><td>8 区数据源</td></tr>
+        <tr><td>Timo v12 内核 + FunASR + SQLite</td><td>L4</td><td class="ok">已有</td><td>确定性与多模态底座</td></tr>
+        <tr><td>OpenShell iron-rule-1</td><td>L3 NemoClaw 框</td><td class="ok">已有 LOCKED</td><td>P3 篡改拦截依据</td></tr>
+        <tr><td>supplier_module 履约 UI</td><td>—</td><td class="out">范围外</td><td>后端有，本轮不做邮件台入口</td></tr>
+        <tr><td>SMTP 自动发信 / OAuth</td><td>—</td><td class="out">范围外</td><td>铁律① draft_only + 默认禁</td></tr>
+        <tr><td>邮件状态机 / Kanban</td><td>—</td><td class="out">范围外</td><td>与 RFQ 状态机冲突</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:12px;color:#5B6B7C;margin-top:12px">
+      <strong>相对首版 ASCII 图的补齐：</strong>图中补上了 OpenShell/Dispatcher、mailbox_api 已有事实、
+      L4 引擎与数据落盘、范围外清单。未再遗漏的关键控制面是 <code>guardrails</code>（输入/工具/输出三段，挂在 agent 执行路径内，图中并入 NemoClaw 控制面语义）。
+    </p>
+  </div>
+
+  <h2>设计取舍（与铁律对齐）</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>决策</th><th>选择</th><th>原因</th></tr></thead>
+      <tbody>
+        <tr><td>Gmail 接入方式</td><td>IMAP + App Password 可选</td><td>无 OAuth 应用注册负担；默认 OFF 守铁律①</td></tr>
+        <tr><td>GitHub 库</td><td>imap_tools</td><td>Apache-2.0 · 纯 Python · 活跃维护 · 非 GPL</td></tr>
+        <tr><td>V12 页面</td><td>新建仪表板 tab，不是重做整个控制台</td><td>运维 models/skills 台保留；业务员看 mailbox + v12</td></tr>
+        <tr><td>流程管理</td><td>只做 HITL 审批 UI</td><td>后端状态机已严；拖拽看板会与转移表冲突</td></tr>
+        <tr><td>上下文联动</td><td>双向跳转 + 面包屑</td><td>零后端成本；把 8 区孤岛变成可导航网络</td></tr>
+        <tr><td>发信</td><td>始终 draft_only</td><td>policy + guardrails + 测试三重锁定</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</main>
+<footer>
+  Union Export Agent · 架构参考页 · 工作目录 index.html ·
+  验收基线 pytest 354+ · 铁律① DETERMINISTIC / draft_only / 数据默认不出车间
+</footer>
+</body>
+</html>

@@ -1,0 +1,2177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Union Export Agent · B 端后台 design-suite v8</title>
+<style>
+/* ============================================================
+   design-suite · B 端工作台 v8
+   视觉规范遵循 DESIGN-suite-v4: 工业绿 #76B900 单 accent,
+   暗色工具感, hairline 描边, 圆角 ≤6px, 无渐变 hero.
+   ============================================================ */
+:root{
+  --bg:#0A0E12; --panel:#0F141B; --card:#121820; --card2:#182130; --line:#232D3B;
+  --ink:#D1D5DB; --mut:#6B7280; --faint:#4B5563;
+  --acc:#76B900; --acc-soft:rgba(118,185,0,.14); --acc-line:rgba(118,185,0,.35);
+  --warn:#F59E0B; --err:#EF4444; --ok:#22C55E; --cyan:#22D3EE; --violet:#8B5CF6;
+  --mono:ui-monospace,'JetBrains Mono','Cascadia Code',Consolas,monospace;
+  --sans:-apple-system,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',sans-serif;
+  --topbar-h:46px; --sidenav-w:208px; --statusbar-h:26px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:13px/1.55 var(--sans);display:flex;flex-direction:column;overflow:hidden}
+::selection{background:var(--acc-soft)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--card2);border:1px solid var(--line);border-radius:5px;padding:6px 9px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--acc-line)}
+input::placeholder,textarea::placeholder{color:var(--faint)}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#26313F;border-radius:5px;border:2px solid var(--bg)}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ── Topbar ── */
+#topbar{height:var(--topbar-h);flex:none;display:flex;align-items:center;gap:14px;padding:0 14px;
+  background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:9px;min-width:0}
+.brand-mark{width:26px;height:26px;flex:none;display:grid;place-items:center;border-radius:6px;
+  background:var(--acc-soft);border:1px solid var(--acc-line);font-size:14px}
+.brand-name{font-weight:700;font-size:14px;letter-spacing:.3px;white-space:nowrap}
+.brand-name .accent{color:var(--acc)}
+.brand-tag{font-size:10px;color:var(--acc);border:1px solid var(--acc-line);border-radius:4px;
+  padding:1px 6px;margin-left:7px;vertical-align:2px;font-weight:600}
+.brand-sub{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#topStatus{display:flex;gap:7px;margin-left:auto;align-items:center;flex-wrap:nowrap;overflow:hidden}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--mut);
+  border:1px solid var(--line);background:var(--card);border-radius:999px;padding:3px 10px;white-space:nowrap}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none}
+.pill.ok .dot{background:var(--ok);box-shadow:0 0 6px rgba(34,197,94,.6)}
+.pill.warn .dot{background:var(--warn)}
+.pill.err .dot{background:var(--err)}
+.pill.lock{color:var(--warn);border-color:rgba(245,158,11,.35)}
+.kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);border-bottom-width:2px;
+  border-radius:4px;padding:1px 5px;color:var(--mut);background:var(--card2)}
+
+/* ── Shell ── */
+#shell{flex:1;display:flex;min-height:0}
+#sidenav{width:var(--sidenav-w);flex:none;background:var(--panel);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;padding:10px 8px;gap:2px;overflow-y:auto}
+.nav-sec{font-size:10px;color:var(--faint);letter-spacing:1.5px;padding:10px 8px 4px;font-weight:600}
+.nav-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:6px;font-size:13px;
+  color:var(--mut);border:1px solid transparent;width:100%;text-align:left}
+.nav-item:hover{color:var(--ink);background:var(--card)}
+.nav-item.active{color:var(--acc);background:var(--acc-soft);border-color:var(--acc-line);font-weight:600}
+.nav-item .ico{width:17px;text-align:center;flex:none;font-size:14px}
+.nav-item .cnt{margin-left:auto;font-size:10px;font-family:var(--mono);color:var(--mut);
+  background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:0 7px}
+.nav-item.active .cnt{color:var(--acc);border-color:var(--acc-line)}
+.nav-item .cnt.alert{color:var(--warn);border-color:rgba(245,158,11,.4)}
+#main{flex:1;min-width:0;overflow-y:auto;padding:16px 20px 28px;position:relative}
+
+/* ── Statusbar ── */
+#statusbar{height:var(--statusbar-h);flex:none;display:flex;align-items:center;gap:16px;padding:0 14px;
+  background:var(--panel);border-top:1px solid var(--line);font-size:11px;color:var(--mut);font-family:var(--mono)}
+#statusbar .lock{color:var(--warn);font-weight:700}
+#statusbar .grow{flex:1}
+#statusbar b{color:var(--ink);font-weight:600}
+
+/* ── View headers ── */
+.view{display:none}
+.view.active{display:block;animation:fadein .18s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.view-hd{display:flex;align-items:flex-end;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.view-hd h2{font-size:17px;font-weight:700;letter-spacing:.2px}
+.view-hd .sub{font-size:11px;color:var(--mut);margin-top:2px}
+.view-hd .acts{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:6px 12px;border-radius:6px;
+  border:1px solid var(--line);background:var(--card2);color:var(--ink);transition:.15s;white-space:nowrap}
+.btn:hover{border-color:var(--acc-line);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:disabled:hover{border-color:var(--line);color:var(--ink)}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#0A0E12;font-weight:700}
+.btn.primary:hover{filter:brightness(1.12);color:#0A0E12}
+.btn.danger{border-color:rgba(239,68,68,.4);color:#fca5a5}
+.btn.danger:hover{border-color:var(--err);color:#fff;background:rgba(239,68,68,.15)}
+.btn.warn{border-color:rgba(245,158,11,.4);color:var(--warn)}
+.btn.warn:hover{background:rgba(245,158,11,.12)}
+.btn.sm{padding:4px 9px;font-size:11px}
+.btn.ghost{background:transparent}
+
+/* ── Cards / grid ── */
+.card{background:var(--card);border:1px solid var(--line);border-radius:7px}
+.card-hd{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.card-hd h3{font-size:13px;font-weight:600}
+.card-hd .sub{font-size:11px;color:var(--mut)}
+.card-hd .acts{margin-left:auto;display:flex;gap:6px}
+.card-bd{padding:14px}
+.grid{display:grid;gap:12px}
+.k6{grid-template-columns:repeat(6,1fr)}
+.k4{grid-template-columns:repeat(4,1fr)}
+.k3{grid-template-columns:repeat(3,1fr)}
+.k2{grid-template-columns:repeat(2,1fr)}
+@media(max-width:1500px){.k6{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1100px){.k6,.k4,.k3,.k2{grid-template-columns:repeat(2,1fr)}}
+
+/* ── KPI ── */
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:7px;padding:13px 15px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--line)}
+.kpi.ok::before{background:var(--ok)} .kpi.warn::before{background:var(--warn)}
+.kpi.err::before{background:var(--err)} .kpi.acc::before{background:var(--acc)}
+.kpi .lbl{font-size:11px;color:var(--mut);display:flex;align-items:center;gap:6px}
+.kpi .val{font-size:24px;font-weight:700;font-family:var(--mono);margin:4px 0 2px;letter-spacing:-.5px}
+.kpi .sub{font-size:11px;color:var(--faint)}
+.kpi .val small{font-size:12px;color:var(--mut);font-weight:400}
+
+/* ── Filters / toolbar ── */
+.toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.toolbar .search{flex:1;min-width:200px;max-width:420px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--card)}
+.seg button{font-size:11px;padding:5px 11px;color:var(--mut);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:none}
+.seg button:hover{color:var(--ink)}
+.seg button.active{background:var(--acc-soft);color:var(--acc);font-weight:600}
+.seg button .n{font-family:var(--mono);font-size:10px;opacity:.75;margin-left:3px}
+
+/* ── Split panes ── */
+.split{display:grid;gap:12px;min-height:0}
+.sp-mail{grid-template-columns:400px 1fr}
+.sp-draw{grid-template-columns:380px 1fr 340px}
+.sp-kb{grid-template-columns:1fr 1fr}
+@media(max-width:1400px){.sp-draw{grid-template-columns:360px 1fr}.sp-draw .pane-ctx{display:none}}
+@media(max-width:1200px){.sp-mail{grid-template-columns:1fr}.sp-kb{grid-template-columns:1fr}}
+.pane{background:var(--card);border:1px solid var(--line);border-radius:7px;display:flex;flex-direction:column;min-height:0;min-width:0}
+.pane-hd{display:flex;align-items:center;gap:9px;padding:9px 12px;border-bottom:1px solid var(--line);flex:none}
+.pane-hd h3{font-size:13px;font-weight:600}
+.pane-hd .hd-sub{font-size:11px;color:var(--mut);font-family:var(--mono)}
+.pane-hd .acts{margin-left:auto;display:flex;gap:6px}
+.pane-bd{padding:12px;overflow-y:auto;min-height:0;flex:1}
+.pane-scroll{overflow-y:auto;flex:1;min-height:0}
+
+/* ── Mail list ── */
+.mail-item{padding:9px 12px 9px 10px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;gap:9px;position:relative}
+.mail-item:hover{background:var(--card2)}
+.mail-item.active{background:var(--acc-soft)}
+.mail-item.active::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--acc)}
+.mail-item .chk{flex:none;padding-top:3px}
+.mail-item .body{flex:1;min-width:0}
+.mail-item .l1{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mail-item .l2{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.mail-item .l3{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:10px;color:var(--faint);font-family:var(--mono)}
+.checkbox{appearance:none;width:14px;height:14px;flex:none;border:1px solid var(--line);border-radius:4px;background:var(--card2);cursor:pointer;position:relative}
+.checkbox:checked{background:var(--acc);border-color:var(--acc)}
+.checkbox:checked::after{content:'✓';position:absolute;inset:0;display:grid;place-items:center;font-size:10px;color:#0A0E12;font-weight:800}
+
+/* ── Tags / badges ── */
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:1px 7px;
+  border-radius:4px;border:1px solid var(--line);color:var(--mut);background:var(--card2);white-space:nowrap}
+.tag.ok{color:var(--ok);border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.08)}
+.tag.warn{color:var(--warn);border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.08)}
+.tag.err{color:var(--err);border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.08)}
+.tag.acc{color:var(--acc);border-color:var(--acc-line);background:var(--acc-soft)}
+.tag.cyan{color:var(--cyan);border-color:rgba(34,211,238,.3);background:rgba(34,211,238,.07)}
+.tag.violet{color:var(--violet);border-color:rgba(139,92,246,.3);background:rgba(139,92,246,.07)}
+
+/* ── Tables ── */
+.tbl-wrap{overflow-x:auto}
+table.tbl{width:100%;border-collapse:collapse;font-size:12px}
+table.tbl th{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--faint);font-weight:600;
+  text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--card)}
+table.tbl td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+table.tbl tbody tr{cursor:pointer}
+table.tbl tbody tr:hover{background:var(--card2)}
+table.tbl tbody tr.sel{background:var(--acc-soft)}
+table.tbl .mono{font-family:var(--mono);font-size:11px}
+table.tbl .num{font-family:var(--mono);text-align:right}
+table.tbl td.wrap{white-space:normal;min-width:180px;max-width:340px}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:var(--ink)}
+th.sortable .arr{color:var(--acc);margin-left:3px}
+
+/* ── Pager / empty / skeleton ── */
+.pager{display:flex;align-items:center;gap:8px;padding:9px 12px;border-top:1px solid var(--line);flex:none;font-size:11px;color:var(--mut)}
+.pager .pages{margin-left:auto;display:flex;gap:4px;align-items:center}
+.pager button{min-width:24px;height:24px;padding:0 6px;border:1px solid var(--line);border-radius:5px;background:var(--card2);
+  font-size:11px;font-family:var(--mono);color:var(--mut)}
+.pager button:hover:not(:disabled){color:var(--ink);border-color:var(--acc-line)}
+.pager button.active{background:var(--acc-soft);border-color:var(--acc-line);color:var(--acc);font-weight:700}
+.pager button:disabled{opacity:.35;cursor:not-allowed}
+.empty{padding:44px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px}
+.empty .ico{font-size:34px;opacity:.5;filter:grayscale(.4)}
+.empty .ttl{font-size:13px;font-weight:600;color:var(--ink)}
+.empty .desc{font-size:11px;color:var(--mut);max-width:420px;line-height:1.7}
+.empty .cta{margin-top:6px;display:flex;gap:8px}
+.skel{background:linear-gradient(90deg,var(--card2) 25%,var(--card) 50%,var(--card2) 75%);
+  background-size:200% 100%;animation:sh 1.3s infinite;border-radius:5px;height:12px}
+@keyframes sh{to{background-position:-200% 0}}
+.skel-row{padding:11px 12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:7px}
+
+/* ── Detail (mail) ── */
+.detail-hd{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px}
+.detail-hd h2{font-size:15px;font-weight:700;line-height:1.4}
+.detail-hd .from{font-size:11px;color:var(--mut);margin-top:5px;font-family:var(--mono)}
+.detail-hd .badges{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.detail-sec{margin-bottom:16px}
+.detail-sec h4{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);margin-bottom:8px;font-weight:700}
+.mail-body{white-space:pre-wrap;font-size:12px;line-height:1.7;background:var(--card2);border:1px solid var(--line);
+  border-radius:6px;padding:12px;max-height:300px;overflow-y:auto}
+.kv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.kv{background:var(--card2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12px;min-width:0}
+.kv .k{display:block;font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px}
+.kv .v{font-family:var(--mono);font-size:11px;word-break:break-all}
+.ctx-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px}
+.ctx-tabs button{font-size:11px;padding:4px 10px;border-radius:5px;border:1px solid var(--line);color:var(--mut);background:var(--card)}
+.ctx-tabs button:hover{color:var(--ink)}
+.ctx-tabs button.active{background:var(--acc-soft);border-color:var(--acc-line);color:var(--acc);font-weight:600}
+pre.json{background:#0A0E14;border:1px solid var(--line);border-radius:6px;padding:11px;font-family:var(--mono);
+  font-size:11px;line-height:1.6;overflow:auto;max-height:380px;color:#9CA8B8}
+
+/* ── Drawing viewer ── */
+.dropzone{border:2px dashed var(--line);border-radius:8px;padding:34px 18px;text-align:center;cursor:pointer;transition:.15s}
+.dropzone:hover,.dropzone.over{border-color:var(--acc);background:var(--acc-soft)}
+.dropzone .ico{font-size:30px;margin-bottom:8px}
+.dropzone .ttl{font-size:13px;font-weight:600}
+.dropzone .sub{font-size:11px;color:var(--mut);margin-top:4px;line-height:1.6}
+.viewer-3d{background:#0D1320;border:1px solid var(--line);border-radius:7px;min-height:280px;
+  display:grid;place-items:center;padding:10px;overflow:hidden}
+.viewer-3d svg{max-width:100%;height:auto}
+.viewer-3d .placeholder{color:var(--faint);font-size:12px;text-align:center;line-height:1.8}
+.draw-item{display:flex;gap:9px;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;align-items:center}
+.draw-item:hover{background:var(--card2)}
+.draw-item.active{background:var(--acc-soft)}
+.draw-item .fi{width:26px;height:26px;flex:none;display:grid;place-items:center;background:var(--card2);
+  border:1px solid var(--line);border-radius:5px;font-size:13px}
+.draw-item .nm{flex:1;min-width:0}
+.draw-item .nm .n{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.draw-item .nm .m{font-size:10px;color:var(--faint);font-family:var(--mono);margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── RAG result cards ── */
+.hit{background:var(--card2);border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-bottom:8px}
+.hit .hd{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--mut)}
+.hit .hd .score{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--acc)}
+.hit .doc{font-size:12px;font-weight:600;margin-top:5px;word-break:break-all}
+.hit .snip{font-size:11px;color:var(--mut);margin-top:4px;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+.hit .src{font-size:10px;color:var(--faint);margin-top:6px;font-family:var(--mono)}
+
+/* ── Models ── */
+.model-card{background:var(--card);border:1px solid var(--line);border-radius:7px;margin-bottom:12px}
+.model-card.locked{border-color:rgba(245,158,11,.3)}
+.model-card .mc-hd{display:flex;align-items:center;gap:11px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.model-card .mc-role{width:30px;height:30px;display:grid;place-items:center;border-radius:6px;font-size:15px;
+  background:var(--card2);border:1px solid var(--line);flex:none}
+.model-card .mc-ttl{font-size:13px;font-weight:700}
+.model-card .mc-desc{font-size:11px;color:var(--mut);margin-top:1px}
+.model-card .mc-bd{padding:12px 14px}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.form-group label{display:block;font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.form-group input,.form-group select{width:100%}
+.form-group .hint{font-size:10px;color:var(--faint);margin-top:3px;font-family:var(--mono)}
+.mc-foot{display:flex;align-items:center;gap:9px;padding:10px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--faint)}
+.mc-foot .lat{margin-left:auto;font-family:var(--mono)}
+.switch{display:inline-flex;align-items:center;gap:7px;font-size:11px;color:var(--mut);cursor:pointer;user-select:none}
+.switch input{appearance:none;width:28px;height:16px;border-radius:999px;background:var(--card2);border:1px solid var(--line);position:relative;cursor:pointer;transition:.15s;padding:0}
+.switch input::after{content:'';position:absolute;top:1px;left:1px;width:12px;height:12px;border-radius:50%;background:var(--faint);transition:.15s}
+.switch input:checked{background:var(--acc-soft);border-color:var(--acc-line)}
+.switch input:checked::after{left:13px;background:var(--acc)}
+.switch.disabled{opacity:.6;cursor:not-allowed}
+
+/* ── Drawer ── */
+#drawer{position:fixed;top:0;right:0;bottom:0;width:520px;max-width:92vw;background:var(--panel);
+  border-left:1px solid var(--line);transform:translateX(102%);transition:transform .22s ease;z-index:60;
+  display:flex;flex-direction:column;box-shadow:-18px 0 50px rgba(0,0,0,.5)}
+#drawer.open{transform:none}
+.drawer-hd{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line);flex:none}
+.drawer-hd h3{font-size:14px;font-weight:700}
+.drawer-hd .x{margin-left:auto;color:var(--mut);font-size:16px;padding:2px 8px;border-radius:5px}
+.drawer-hd .x:hover{color:var(--ink);background:var(--card2)}
+.drawer-bd{flex:1;overflow-y:auto;padding:16px}
+
+/* ── Toasts ── */
+#toasts{position:fixed;bottom:38px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:100}
+.toast{background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:6px;
+  padding:9px 14px;font-size:12px;box-shadow:0 8px 26px rgba(0,0,0,.45);animation:tin .2s ease;max-width:380px}
+.toast.err{border-left-color:var(--err)}
+.toast.warn{border-left-color:var(--warn)}
+@keyframes tin{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+
+/* ── Command palette ── */
+#palette{position:fixed;inset:0;background:rgba(4,7,10,.7);z-index:90;display:none;place-items:start center;padding-top:14vh}
+#palette.open{display:grid}
+.palette-box{width:560px;max-width:92vw;background:var(--panel);border:1px solid var(--line);border-radius:9px;
+  overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.palette-box input{width:100%;border:none;border-radius:0;padding:13px 16px;font-size:14px;background:transparent}
+.palette-box input:focus{border:none}
+.palette-list{max-height:340px;overflow-y:auto;border-top:1px solid var(--line)}
+.palette-item{display:flex;align-items:center;gap:11px;padding:10px 16px;font-size:13px;cursor:pointer}
+.palette-item:hover,.palette-item.sel{background:var(--acc-soft)}
+.palette-item .ico{width:20px;text-align:center}
+.palette-item .hint{margin-left:auto;font-size:10px;color:var(--faint);font-family:var(--mono)}
+
+/* ── misc ── */
+.row{display:flex;gap:9px;align-items:center}
+.muted{color:var(--mut)} .faint{color:var(--faint)} .mono{font-family:var(--mono)}
+.err-text{color:var(--err)} .ok-text{color:var(--ok)} .warn-text{color:var(--warn)}
+.mt8{margin-top:8px} .mt12{margin-top:12px} .mt16{margin-top:16px} .mb8{margin-bottom:8px}
+.flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+.hint-inline{font-size:11px;color:var(--faint);line-height:1.7}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--faint);align-items:center}
+.dot-legend{display:inline-flex;align-items:center;gap:5px}
+.dot-legend i{width:7px;height:7px;border-radius:50%;display:inline-block}
+.batch-bar{display:none;align-items:center;gap:9px;padding:8px 12px;background:var(--acc-soft);
+  border-bottom:1px solid var(--acc-line);font-size:12px;color:var(--acc);font-weight:600}
+.batch-bar.show{display:flex}
+.batch-bar .cnt-b{font-family:var(--mono)}
+.batch-bar .spacer{flex:1}
+.batch-bar .x{color:var(--mut);padding:2px 8px;border-radius:4px}
+.batch-bar .x:hover{color:var(--ink);background:rgba(255,255,255,.06)}
+.loading-inline{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--mut);padding:26px;justify-content:center}
+.spinner{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ Topbar ═══════════ -->
+<header id="topbar">
+  <div class="brand">
+    <div class="brand-mark">🏭</div>
+    <div style="min-width:0">
+      <div class="brand-name">Union <span class="accent">Export</span> Agent<span class="brand-tag">design-suite · B 端 v8</span></div>
+      <div class="brand-sub">工业非标外贸工作台 · Omni 推理 + Embed 检索 · 本地优先 / 可审计</div>
+    </div>
+  </div>
+  <div id="topStatus">
+    <span class="pill" id="pillApi"><span class="dot"></span>API …</span>
+    <span class="pill" id="pillEngine"><span class="dot"></span>引擎 …</span>
+    <span class="pill" id="pillLlm"><span class="dot"></span>LLM …</span>
+    <span class="pill" id="pillEmbed"><span class="dot"></span>Embed …</span>
+    <span class="pill lock">🔒 铁律① 已锁定</span>
+    <button class="btn sm ghost" onclick="Suite.togglePalette()" title="命令面板"><span class="kbd">Ctrl</span>+<span class="kbd">K</span></button>
+  </div>
+</header>
+
+<div id="shell">
+  <!-- ═══════════ Side nav ═══════════ -->
+  <nav id="sidenav">
+    <div class="nav-sec">经营概览</div>
+    <button class="nav-item active" data-view="dashboard"><span class="ico">📊</span>仪表盘</button>
+    <div class="nav-sec">业务作业</div>
+    <button class="nav-item" data-view="inbox"><span class="ico">📧</span>客户邮箱<span class="cnt" id="navCntMail">0</span></button>
+    <button class="nav-item" data-view="orders"><span class="ico">📋</span>订单 / RFQ<span class="cnt" id="navCntOrders">0</span></button>
+    <button class="nav-item" data-view="drawings"><span class="ico">📐</span>STEP 图纸<span class="cnt" id="navCntDraw">0</span></button>
+    <button class="nav-item" data-view="insight"><span class="ico">🧠</span>客户洞察 <span style="font-size:9px;color:var(--faint)">RAG/联网</span></button>
+    <div class="nav-sec">平台治理</div>
+    <button class="nav-item" data-view="models"><span class="ico">⚙️</span>模型设置<span class="cnt" id="navCntModels">0</span></button>
+    <button class="nav-item" data-view="raglib"><span class="ico">📚</span>RAG 多模态库<span class="cnt" id="navCntRag">0</span></button>
+    <button class="nav-item" data-view="ops"><span class="ico">🩺</span>本地状态</button>
+  </nav>
+
+  <!-- ═══════════ Main ═══════════ -->
+  <main id="main">
+
+    <!-- ── View: Dashboard ── -->
+    <section class="view active" id="view-dashboard">
+      <div class="view-hd">
+        <div><h2>经营仪表盘</h2><div class="sub">HITL 待批 · 在办订单 · 客户资产 · 模型与内核在线情况</div></div>
+        <div class="acts">
+          <button class="btn sm" onclick="Dashboard.refresh()">↻ 刷新</button>
+          <span class="mono faint" id="dashTs" style="font-size:11px"></span>
+        </div>
+      </div>
+      <div class="grid k6 mb8" id="dashKpis"></div>
+      <div class="grid k2">
+        <div class="card">
+          <div class="card-hd"><h3>📋 最近订单</h3><span class="sub">state 聚合</span>
+            <div class="acts"><button class="btn sm ghost" onclick="Suite.go('orders')">查看全部 →</button></div></div>
+          <div class="pane-scroll" style="max-height:330px" id="dashOrders"></div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><h3>🧭 待办与提示</h3><span class="sub">本地诚实行事历</span></div>
+          <div class="card-bd" id="dashNotes" style="font-size:12px;line-height:2"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── View: Inbox ── -->
+    <section class="view" id="view-inbox">
+      <div class="view-hd">
+        <div><h2>客户邮箱</h2><div class="sub">data/mailbox · Gmail IMAP 拉信(默认关,显式开启) · 本地 .eml 上传 · 7 区上下文</div></div>
+        <div class="acts">
+          <button class="btn sm" onclick="Inbox.refresh()">↻ 刷新</button>
+          <button class="btn sm primary" onclick="Inbox.uploadEml()">⬆ 上传 .eml</button>
+          <input type="file" id="inboxFile" accept=".eml,.msg,.txt" style="display:none" onchange="Inbox.onUploadEml(event)"/>
+        </div>
+      </div>
+      <div class="split sp-mail" style="height:calc(100vh - var(--topbar-h) - var(--statusbar-h) - 108px);min-height:420px">
+        <div class="pane">
+          <div class="pane-hd">
+            <h3>📮 收件箱</h3><span class="hd-sub" id="inboxTotal">…</span>
+            <div class="acts"><span class="hint-inline" id="inboxSrc"></span></div>
+          </div>
+          <div class="pane-bd" style="padding:0;display:flex;flex-direction:column;min-height:0">
+            <div class="toolbar" style="margin:0;padding:10px 12px 0">
+              <input class="search" id="inboxQ" placeholder="搜索主题 / 发件人…" oninput="Inbox.applyFilter()"/>
+              <select id="inboxPagesize" onchange="Inbox.applyFilter()" style="width:90px">
+                <option value="20">20/页</option>
+                <option value="50">50/页</option>
+                <option value="100">100/页</option>
+              </select>
+            </div>
+            <div class="toolbar" style="margin:0;padding:4px 12px 8px">
+              <div class="seg" id="inboxSeg">
+                <button class="active" data-f="all" onclick="Inbox.setSeg('all',this)">全部<span class="n" id="segN-all">0</span></button>
+                <button data-f="HITL" onclick="Inbox.setSeg('HITL',this)">🛡 HITL<span class="n" id="segN-HITL">0</span></button>
+                <button data-f="NEW" onclick="Inbox.setSeg('NEW',this)">🆕 待处理<span class="n" id="segN-NEW">0</span></button>
+                <button data-f="BLOCKED" onclick="Inbox.setSeg('BLOCKED',this)">🚫 BLOCKED<span class="n" id="segN-BLOCKED">0</span></button>
+                <button data-f="DONE" onclick="Inbox.setSeg('DONE',this)">✅ 已办<span class="n" id="segN-DONE">0</span></button>
+              </div>
+            </div>
+            <div class="batch-bar" id="inboxBatch">
+              <span>已选 <span class="cnt-b" id="inboxBatchN">0</span> 封</span>
+              <span class="spacer"></span>
+              <button class="btn sm warn" onclick="Inbox.batch('retry')">↻ 重跑</button>
+              <button class="btn sm danger" onclick="Inbox.batch('delete')">🗑 删除</button>
+              <span class="x" onclick="Inbox.clearSel()">✕</span>
+            </div>
+            <div id="inboxList" style="flex:1;overflow-y:auto"></div>
+            <div class="pager" id="inboxPager"></div>
+          </div>
+        </div>
+        <div class="pane">
+          <div class="pane-hd"><h3 id="inboxDetailTitle">📨 邮件详情</h3>
+            <div class="acts" id="inboxDetailActs"></div></div>
+          <div class="pane-bd" id="inboxDetail"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── View: Orders ── -->
+    <section class="view" id="view-orders">
+      <div class="view-hd">
+        <div><h2>订单 / RFQ 管线</h2><div class="sub">data/contexts 聚合 · Intake → DFM → 报价 → 验证 → HITL → Reply → CRM 闭环</div></div>
+        <div class="acts">
+          <button class="btn sm" onclick="Orders.exportCsv()">⬇ 导出 CSV</button>
+          <button class="btn sm" onclick="Orders.refresh()">↻ 刷新</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <input class="search" id="ordQ" placeholder="搜索 context_id / 客户 / 产品…" oninput="Orders.debouncedSearch()"/>
+        <div class="seg" id="ordSeg">
+          <button class="active" data-f="" onclick="Orders.setSeg('',this)">全部</button>
+          <button data-f="INTAKE" onclick="Orders.setSeg('INTAKE',this)">Intake</button>
+          <button data-f="ANALYZ" onclick="Orders.setSeg('ANALYZ',this)">分析中</button>
+          <button data-f="QUOT" onclick="Orders.setSeg('QUOT',this)">已报价</button>
+          <button data-f="HITL" onclick="Orders.setSeg('HITL',this)">🛡 HITL</button>
+          <button data-f="REPLY" onclick="Orders.setSeg('REPLY',this)">已回函</button>
+          <button data-f="DONE" onclick="Orders.setSeg('DONE',this)">✅ 结案</button>
+        </div>
+        <select id="ordCust" onchange="Orders.refresh()"><option value="">所有客户</option></select>
+        <select id="ordSort" onchange="Orders.refresh()">
+          <option value="mtime_desc">最近更新</option>
+          <option value="mtime_asc">最早更新</option>
+          <option value="price_desc">金额 ↓</option>
+          <option value="price_asc">金额 ↑</option>
+        </select>
+        <span class="spacer"></span>
+        <span class="hint-inline" id="ordTotal"></span>
+      </div>
+      <div class="batch-bar" id="ordBatch">
+        <span>已选 <span class="cnt-b" id="ordBatchN">0</span> 条</span>
+        <span class="spacer"></span>
+        <button class="btn sm primary" onclick="Orders.batchCrmSync()">⇄ 批量 CRM 同步</button>
+        <button class="btn sm" onclick="Orders.exportCsv(true)">⬇ 导出所选 CSV</button>
+        <span class="x" onclick="Orders.clearSel()">✕</span>
+      </div>
+      <div class="card">
+        <div class="tbl-wrap">
+          <table class="tbl" id="ordTbl">
+            <thead><tr>
+              <th style="width:30px"></th>
+              <th class="sortable">context_id</th><th>状态</th><th>客户</th><th>材质 / 数量</th>
+              <th class="num">单价</th><th class="num">总额</th><th class="num">毛利</th><th class="num">货期</th><th>更新时间</th>
+            </tr></thead>
+            <tbody id="ordTbody"></tbody>
+          </table>
+        </div>
+        <div class="pager" id="ordPager"></div>
+      </div>
+    </section>
+
+    <!-- ── View: Drawings ── -->
+    <section class="view" id="view-drawings">
+      <div class="view-hd">
+        <div><h2>STEP 图纸工作台</h2><div class="sub">OCP B-rep 真实几何 · 浏览器 SVG 缩略图 · DFM 特征抽取 · 关联客户 RAG</div></div>
+        <div class="acts"><button class="btn sm" onclick="Drawings.refresh()">↻ 刷新</button></div>
+      </div>
+      <div class="split sp-draw" style="height:calc(100vh - var(--topbar-h) - var(--statusbar-h) - 108px);min-height:480px">
+        <div class="pane">
+          <div class="pane-hd"><h3>📐 图纸库</h3><span class="hd-sub" id="drawTotal">…</span></div>
+          <div class="toolbar" style="margin:0;padding:10px 12px 0">
+            <input class="search" id="drawQ" placeholder="搜索文件名 / sha256…" oninput="Drawings.applyFilter()"/>
+          </div>
+          <div class="pane-scroll" id="drawList" style="max-height:none"></div>
+          <div class="pager" id="drawPager"></div>
+        </div>
+        <div class="pane">
+          <div class="pane-hd"><h3>👁 3D STEP 预览</h3><span class="hd-sub" id="drawViewerSub">未选择</span></div>
+          <div class="pane-bd">
+            <div class="dropzone" id="drawDrop">
+              <div class="ico">📐</div>
+              <div class="ttl">拖拽 .step / .stp 到此处上传</div>
+              <div class="sub">或点击选择 · ≤20MB · 引擎离线时降级为占位但不阻断</div>
+              <input type="file" id="drawFile" accept=".step,.stp,.STEP,.STP" style="display:none"/>
+            </div>
+            <div class="viewer-3d mt12" id="drawViewer">
+              <div class="placeholder">🧊<br/>从左侧选择图纸, 或上传新 STEP<br/><span style="font-size:10px">服务端 Open CASCADE 渲染等距投影 SVG</span></div>
+            </div>
+            <div id="drawMeta" class="mt12"></div>
+          </div>
+        </div>
+        <div class="pane pane-ctx">
+          <div class="pane-hd"><h3>🧠 图纸上下文</h3></div>
+          <div class="pane-bd">
+            <div class="detail-sec">
+              <h4>🔍 工艺 / 客户 RAG 检索</h4>
+              <div class="row mb8">
+                <input id="drawRagQ" placeholder="对该图纸提问…" style="flex:1" onkeydown="if(event.key==='Enter')Drawings.rag()"/>
+                <button class="btn sm primary" onclick="Drawings.rag()">检索</button>
+              </div>
+              <div id="drawRagOut"></div>
+            </div>
+            <div class="detail-sec">
+              <h4>🌐 联网检索 (SearXNG)</h4>
+              <div class="row mb8">
+                <input id="drawWebQ" placeholder="材料标准 / 工艺流程…" style="flex:1" onkeydown="if(event.key==='Enter')Drawings.web()"/>
+                <button class="btn sm" onclick="Drawings.web()">搜索</button>
+              </div>
+              <div id="drawWebOut"></div>
+            </div>
+            <div class="detail-sec">
+              <h4>🩺 DFM 可制造性</h4>
+              <div id="drawDfm" class="hint-inline">上传或选择图纸后展示几何事实与特征分布。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── View: Insight ── -->
+    <section class="view" id="view-insight">
+      <div class="view-hd">
+        <div><h2>客户洞察 · RAG / 联网</h2><div class="sub">Embed-1B 语义检索本地知识库 + SearXNG 联网尽调 · 双源对照, 离线显式降级不冒充</div></div>
+      </div>
+      <div class="card mb8">
+        <div class="card-bd">
+          <div class="row" style="align-items:flex-end">
+            <div class="form-group" style="flex:1">
+              <label>查询问题</label>
+              <input id="insQ" placeholder="例: 6061 铝件阳极氧化色差的历史处理案例 / 客户 A 的过往报价策略…" onkeydown="if(event.key==='Enter')Insight.run()"/>
+            </div>
+            <div class="form-group" style="width:180px">
+              <label>客户 ID (可选)</label>
+              <input id="insCust" placeholder="限定客户沙箱"/>
+            </div>
+            <div class="form-group" style="width:150px">
+              <label>返回条数</label>
+              <select id="insLimit">
+                <option value="5">Top 5</option><option value="10" selected>Top 10</option><option value="20">Top 20</option>
+              </select>
+            </div>
+            <button class="btn primary" onclick="Insight.run()">🔍 检索</button>
+            <button class="btn" onclick="Insight.webOnly()">🌐 仅联网</button>
+          </div>
+        </div>
+      </div>
+      <div class="grid k2">
+        <div class="card">
+          <div class="card-hd"><h3>📚 本地 RAG 知识库</h3><span class="sub" id="insRagSrc">未检索</span></div>
+          <div class="card-bd" id="insRagOut" style="min-height:300px"></div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><h3>🌐 联网搜索</h3><span class="sub" id="insWebSrc">未检索</span></div>
+          <div class="card-bd" id="insWebOut" style="min-height:300px"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── View: Models ── -->
+    <section class="view" id="view-models">
+      <div class="view-hd">
+        <div><h2>模型设置</h2><div class="sub">config/models.yaml · Omni 推理 (LLM/VLM) + Embed-1B 检索 + ASR + OCR · deterministic 角色锁定</div></div>
+        <div class="acts">
+          <button class="btn sm" onclick="Models.refresh()">↻ 重新加载</button>
+          <button class="btn sm" onclick="Models.probeAll()">🔍 测试全部连接</button>
+          <button class="btn sm primary" onclick="Models.save()">💾 保存配置</button>
+        </div>
+      </div>
+      <div id="modelsWrap"></div>
+      <div class="card mt8">
+        <div class="card-hd"><h3>🧭 funasr 多模态网关</h3><span class="sub">ASR / VLM / Embedding 统一入口</span></div>
+        <div class="card-bd" id="modelsGateway"></div>
+      </div>
+    </section>
+
+    <!-- ── View: RAG Library ── -->
+    <section class="view" id="view-raglib">
+      <div class="view-hd">
+        <div><h2>多模态 RAG 库管理</h2><div class="sub">email / pdf / excel / step / image / zip(嵌套·GBK) → Embed-1B 向量化 · zip-slip 显式拒绝</div></div>
+        <div class="acts"><button class="btn sm" onclick="RagLib.refresh()">↻ 刷新</button></div>
+      </div>
+      <div class="split sp-kb" style="height:calc(100vh - var(--topbar-h) - var(--statusbar-h) - 108px);min-height:480px">
+        <div class="pane">
+          <div class="pane-hd"><h3>📚 已入库文档</h3><span class="hd-sub" id="ragTotal">…</span>
+            <div class="acts"><select id="ragCustFilter" onchange="RagLib.refresh()"><option value="">所有客户</option></select></div></div>
+          <div class="toolbar" style="margin:0;padding:10px 12px 0">
+            <input class="search" id="ragQ" placeholder="搜索 doc id / 客户…" oninput="RagLib.applyFilter()"/>
+          </div>
+          <div class="batch-bar" id="ragBatch">
+            <span>已选 <span class="cnt-b" id="ragBatchN">0</span> 篇</span><span class="spacer"></span>
+            <button class="btn sm danger" onclick="RagLib.batchDelete()">🗑 批量删除</button>
+            <span class="x" onclick="RagLib.clearSel()">✕</span>
+          </div>
+          <div class="tbl-wrap pane-scroll" style="flex:1;min-height:0">
+            <table class="tbl">
+              <thead><tr><th style="width:30px"></th><th>doc id</th><th>客户</th><th>标签</th><th class="num">字符数</th><th>入库时间</th></tr></thead>
+              <tbody id="ragTbody"></tbody>
+            </table>
+          </div>
+          <div class="pager" id="ragPager"></div>
+        </div>
+        <div class="pane">
+          <div class="pane-bd">
+            <div class="detail-sec">
+              <h4>📥 入库 (Embed-1B 向量化)</h4>
+              <div class="dropzone" id="ragDrop">
+                <div class="ico">📥</div>
+                <div class="ttl">点击或拖拽文件入库</div>
+                <div class="sub">.pdf / .docx / .txt / .md / .step / .xlsx / .csv / .png / .jpg / .zip (递归, 内置 GBK 兼容)</div>
+                <input type="file" id="ragFile" multiple style="display:none"/>
+              </div>
+              <div class="row mt8">
+                <input id="ragCust" placeholder="客户 ID (可选)" style="flex:1"/>
+                <input id="ragTags" placeholder="标签, 逗号分隔" style="flex:1"/>
+              </div>
+              <div id="ragIngestOut" class="mt8"></div>
+            </div>
+            <div class="detail-sec">
+              <h4>🔍 入库内容试检索</h4>
+              <div class="row mb8">
+                <input id="ragSearchQ" placeholder="自然语言查询已入库内容…" style="flex:1" onkeydown="if(event.key==='Enter')RagLib.testSearch()"/>
+                <select id="ragSearchCust"><option value="">所有客户</option></select>
+                <button class="btn sm primary" onclick="RagLib.testSearch()">检索</button>
+              </div>
+              <div id="ragSearchOut"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── View: Ops ── -->
+    <section class="view" id="view-ops">
+      <div class="view-hd">
+        <div><h2>本地状态查询</h2><div class="sub">内核 / 邮件链路 / 缓存 / 热配置 / NIM · 只读聚合, 30s 自动刷新</div></div>
+        <div class="acts">
+          <label class="switch"><input type="checkbox" id="opsAuto" checked onchange="Ops.toggleAuto()"/>自动刷新</label>
+          <button class="btn sm" onclick="Ops.refresh()">↻ 刷新</button>
+          <span class="mono faint" id="opsTs" style="font-size:11px"></span>
+        </div>
+      </div>
+      <div class="grid k6 mb8" id="opsKpis"></div>
+      <div class="grid k2">
+        <div class="card">
+          <div class="card-hd"><h3>🧱 Timo v12 内核</h3><span class="sub">calc_quote + ConflictChecker</span></div>
+          <div class="card-bd" id="opsV12" style="min-height:180px"></div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><h3>🛡 DFM C1–C6 分布</h3><span class="sub">trace span 聚合</span></div>
+          <div class="card-bd" id="opsDfm"></div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><h3>📡 邮件无人值守链路</h3><span class="sub">puller + orchestrator</span></div>
+          <div class="card-bd" id="opsMail" style="min-height:180px"></div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><h3>⚡ Cache / NIM / 热配置</h3></div>
+          <div class="card-bd" id="opsCache" style="min-height:180px"></div>
+        </div>
+        <div class="card" style="grid-column:1/-1">
+          <div class="card-hd"><h3>🔐 Audit 哈希链 (v12 traces)</h3><span class="sub" id="opsAuditSub"></span></div>
+          <div class="card-bd"><pre class="json" id="opsAudit" style="max-height:220px">…</pre></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ═══════════ Statusbar ═══════════ -->
+<footer id="statusbar">
+  <span class="lock">🔒 iron-rule-1 LOCKED</span>
+  <span>报价/DFM 走确定性内核, 不经 LLM 裁决</span>
+  <span class="grow"></span>
+  <span id="sbEngine">engine …</span>
+  <span id="sbApi">api …</span>
+  <span id="sbLlm">llm …</span>
+  <span id="sbAudit">audit …</span>
+  <span id="sbClock">—</span>
+</footer>
+
+<!-- ═══════════ Drawer ═══════════ -->
+<aside id="drawer">
+  <div class="drawer-hd"><h3 id="drawerTitle">详情</h3><span class="x" onclick="Suite.closeDrawer()">✕</span></div>
+  <div class="drawer-bd" id="drawerBd"></div>
+</aside>
+
+<!-- ═══════════ Toasts ═══════════ -->
+<div id="toasts"></div>
+
+<!-- ═══════════ Command palette ═══════════ -->
+<div id="palette" onclick="if(event.target===this)Suite.togglePalette()">
+  <div class="palette-box">
+    <input id="palInput" placeholder="输入命令或跳转… (Esc 关闭)" oninput="Suite.filterPalette()" onkeydown="Suite.palKey(event)"/>
+    <div class="palette-list" id="palList"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ============================================================
+   Suite · B 端工作台核心 (design-suite v8)
+   所有端点均与服务端契约逐一核对 (services/api_server.py,
+   services/mailbox_api.py, services/model_config.py,
+   services/v12_api.py, services/flywheel_api.py).
+   ============================================================ */
+const Suite = (() => {
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+
+  /* ── API client ── */
+  async function req(method, path, { params, body, form } = {}) {
+    let url = path;
+    if (params) {
+      const qs = new URLSearchParams(Object.fromEntries(
+        Object.entries(params).filter(([_, v]) => v != null && v !== ''))).toString();
+      if (qs) url += (path.includes('?') ? '&' : '?') + qs;
+    }
+    const opt = { method, credentials: 'omit' };
+    if (form) opt.body = form;
+    else if (body !== undefined) { opt.headers = { 'Content-Type': 'application/json' }; opt.body = JSON.stringify(body); }
+    const r = await fetch(url, opt);
+    const ct = r.headers.get('content-type') || '';
+    const data = ct.includes('json') ? await r.json().catch(() => null) : await r.text();
+    if (!r.ok) {
+      let detail = `${r.status} ${r.statusText}`;
+      if (data && typeof data === 'object') detail = data.detail || data.error || detail;
+      else if (typeof data === 'string' && data.trim()) detail = data.slice(0, 160);
+      const e = new Error(detail); e.status = r.status; throw e;
+    }
+    return data;
+  }
+  const get = (p, params) => req('GET', p, { params });
+  const post = (p, body) => req('POST', p, { body });
+  const postForm = (p, form) => req('POST', p, { form });
+  const del = p => req('DELETE', p);
+  const upload = (p, form) => req('POST', p, { form });
+
+  /* ── Utils ── */
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function el(tag, attrs, ...kids) {
+    const e = document.createElement(tag);
+    if (attrs) for (const k in attrs) {
+      if (k === 'class') e.className = attrs[k];
+      else if (k === 'style') e.setAttribute('style', attrs[k]);
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
+      else if (k === 'html') e.innerHTML = attrs[k];
+      else if (k === 'checked') e.checked = !!attrs[k];   // property, 不是 attribute
+      else if (k === 'value') e.value = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    }
+    kids.flat().forEach(c => {
+      if (c == null || c === false) return;
+      e.appendChild(typeof c === 'object' ? c : document.createTextNode(String(c)));
+    });
+    return e;
+  }
+  function fmtTime(ts, withDate = true) {
+    if (!ts) return '—';
+    const d = new Date(ts * (ts > 1e12 ? 0.001 : 1));
+    const now = new Date();
+    const diff = (now - d) / 1000;
+    if (diff < 0) return d.toLocaleString('zh-CN', { hour12: false });
+    if (diff < 60) return Math.floor(diff) + 's 前';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm 前';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h 前';
+    if (withDate && diff < 86400 * 30) return Math.floor(diff / 86400) + 'd 前';
+    return d.toLocaleDateString('zh-CN');
+  }
+  function fmtDT(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts * (ts > 1e12 ? 0.001 : 1));
+    return d.toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+  function fmtSize(b) {
+    if (b == null) return '—';
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(1) + ' MB';
+  }
+  function fmtMoney(v, cur = 'CNY') {
+    if (v == null || isNaN(v)) return '—';
+    const sym = { CNY: '¥', USD: '$', EUR: '€' }[cur] || (cur + ' ');
+    return sym + Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+  }
+  function safeArr(v) { return Array.isArray(v) ? v : []; }
+
+  /* ── Toast ── */
+  function toast(msg, type = 'ok', ttl = 3600) {
+    const t = el('div', { class: 'toast ' + (type === 'ok' ? '' : type) }, msg);
+    $('#toasts').appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .25s'; setTimeout(() => t.remove(), 260); }, ttl);
+  }
+
+  /* ── Shared renderers ── */
+  function renderPager(bar, total, page, perPage, onChange) {
+    bar.innerHTML = '';
+    const pages = Math.max(1, Math.ceil(total / perPage));
+    const mk = (label, p, dis, active) => {
+      const b = el('button', { onclick: () => !dis && onChange(p) }, label);
+      if (dis) b.disabled = true;
+      if (active) b.classList.add('active');
+      return b;
+    };
+    bar.appendChild(el('span', null, `共 ${total} 条 · 第 ${page}/${pages} 页`));
+    const pp = el('div', { class: 'pages' });
+    pp.appendChild(mk('‹', page - 1, page <= 1));
+    const max = 7;
+    let start = Math.max(1, Math.min(page - 3, pages - max + 1));
+    let end = Math.min(pages, start + max - 1);
+    start = Math.max(1, end - max + 1);
+    if (start > 1) pp.appendChild(el('span', null, '…'));
+    for (let i = start; i <= end; i++) pp.appendChild(mk(String(i), i, false, i === page));
+    if (end < pages) pp.appendChild(el('span', null, '…'));
+    pp.appendChild(mk('›', page + 1, page >= pages));
+    bar.appendChild(pp);
+  }
+  function renderEmpty(box, ico, ttl, desc, cta) {
+    box.innerHTML = '';
+    box.appendChild(el('div', { class: 'empty' },
+      el('div', { class: 'ico' }, ico),
+      el('div', { class: 'ttl' }, ttl),
+      el('div', { class: 'desc' }, desc),
+      cta ? el('div', { class: 'cta' }, Array.isArray(cta) ? cta : [cta]) : null));
+  }
+  function renderSkelList(box, n = 5) {
+    box.innerHTML = '';
+    for (let i = 0; i < n; i++)
+      box.appendChild(el('div', { class: 'skel-row' },
+        el('div', { class: 'skel', style: 'width:55%' }),
+        el('div', { class: 'skel', style: 'width:85%' }),
+        el('div', { class: 'skel', style: 'width:35%' })));
+  }
+  function stateTag(state) {
+    const s = String(state || 'UNKNOWN').toUpperCase();
+    const map = {
+      HITL: ['warn', '🛡 HITL'], BLOCKED: ['err', '🚫 BLOCKED'], DONE: ['ok', '✅ 已办'],
+      PASS: ['ok', '✅ PASS'], NEW: ['cyan', '🆕 NEW'], PROCESSING: ['violet', '⏳ 处理中'],
+      FAILED: ['err', '✗ FAILED'], DEAD: ['', '☠ DEAD'], REPLY: ['acc', '✉ 已回函'],
+      QUOTED: ['acc', '💰 已报价'], ANALYZED: ['cyan', '🔬 已分析'], INTAKE: ['cyan', '📥 Intake'],
+      HUMAN_APPROVAL: ['warn', '🛡 待审批'], VERIFIED: ['acc', '🛡 已验证'], CLOSED: ['', '🗄 结案'],
+      WON: ['ok', '🏆 成交'], LOST: ['', '💤 丢单'], CRM: ['violet', '⇄ CRM']
+    };
+    const [cls, label] = map[s] || ['', s];
+    return el('span', { class: 'tag ' + cls }, label);
+  }
+  function jsonPre(obj) {
+    return el('pre', { class: 'json' }, typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2));
+  }
+
+  /* ── View switching ── */
+  const VIEWS = ['dashboard', 'inbox', 'orders', 'drawings', 'insight', 'models', 'raglib', 'ops'];
+  let currentView = 'dashboard';
+  function go(name) {
+    if (!VIEWS.includes(name)) name = 'dashboard';
+    currentView = name;
+    $$('#sidenav .nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+    $$('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+    location.hash = name;
+    ({ dashboard: Dashboard.load, inbox: Inbox.load, orders: Orders.load,
+       drawings: Drawings.load, insight: () => {}, models: Models.load,
+       raglib: RagLib.load, ops: Ops.load }[name] || (() => {}))();
+  }
+  function refreshCounters() {
+    const inc = Store.counters || {};
+    const set = (id, v, alert) => { const e = $('#' + id); if (e) { e.textContent = v; e.classList.toggle('alert', !!alert); } };
+    set('navCntMail', inc.mailTotal ?? 0, (inc.mailHitl ?? 0) > 0 ? true : false);
+    set('navCntOrders', inc.orderTotal ?? 0, false);
+    set('navCntDraw', inc.drawTotal ?? 0, false);
+    set('navCntRag', inc.ragTotal ?? 0, false);
+    set('navCntModels', inc.modelsOnline != null ? `${inc.modelsOnline}/${inc.modelsTotal}` : '?', false);
+  }
+  const Store = { counters: {}, modelsProbe: {}, health: null };
+
+  /* ── Status polling ── */
+  async function pollStatus() {
+    try {
+      const h = await get('/health');
+      Store.health = h;
+      setPill('pillApi', 'API ' + (h.status || 'ok'), 'ok');
+      setPill('pillEngine', '引擎 ' + (h.engine ? '在线' : '离线'), h.engine ? 'ok' : 'err');
+      $('#sbEngine').textContent = 'engine ' + (h.engine || 'off').slice(0, 26);
+      $('#sbApi').textContent = 'api ok · ctx ' + (h.contexts ?? 0);
+      $('#sbAudit').textContent = 'audit ' + (h.contexts ?? 0) + ' traces';
+    } catch (e) {
+      setPill('pillApi', 'API 离线', 'err');
+      setPill('pillEngine', '引擎 离线', 'err');
+      $('#sbApi').textContent = 'api unreachable';
+    }
+    try {
+      const m = await get('/v1/models/config');
+      Store.modelsProbe = m.probe || {};
+      const keys = Object.keys(m.config?.models || {});
+      const online = keys.filter(k => Store.modelsProbe[k] && Store.modelsProbe[k].online).length;
+      Store.counters.modelsOnline = online;
+      Store.counters.modelsTotal = keys.length;
+      const llm = Store.modelsProbe.llm || {};
+      setPill('pillLlm', 'LLM ' + (llm.online ? `${llm.latency_ms ?? ''}ms` : '离线'), llm.online ? 'ok' : 'err');
+      const emb = Store.modelsProbe.embedding || {};
+      setPill('pillEmbed', 'Embed ' + (emb.online ? `${emb.latency_ms ?? ''}ms` : '离线'), emb.online ? 'ok' : 'err');
+      $('#sbLlm').textContent = 'llm ' + (llm.online ? 'online' : 'offline') + ' · embed ' + (emb.online ? 'online' : 'offline');
+      refreshCounters();
+    } catch (e) { /* keep last state */ }
+  }
+  function setPill(id, text, cls) {
+    const elx = $('#' + id);
+    if (!elx) return;
+    elx.innerHTML = '<span class="dot"></span>' + esc(text);
+    elx.className = 'pill' + (cls === 'ok' ? ' ok' : cls === 'err' ? ' err' : cls === 'warn' ? ' warn' : '');
+  }
+
+  /* ── Drawer ── */
+  function openDrawer(title, node) {
+    $('#drawerTitle').textContent = title;
+    const bd = $('#drawerBd');
+    bd.innerHTML = '';
+    if (typeof node === 'string') bd.appendChild(jsonPre(node)); else bd.appendChild(node);
+    $('#drawer').classList.add('open');
+  }
+  function closeDrawer() { $('#drawer').classList.remove('open'); }
+
+  /* ── Command palette ── */
+  const PAL_COMMANDS = [
+    { k: '仪表盘', d: 'go:dashboard', i: '📊' },
+    { k: '客户邮箱', d: 'go:inbox', i: '📧' },
+    { k: '订单 / RFQ', d: 'go:orders', i: '📋' },
+    { k: 'STEP 图纸', d: 'go:drawings', i: '📐' },
+    { k: '客户洞察 RAG/联网', d: 'go:insight', i: '🧠' },
+    { k: '模型设置', d: 'go:models', i: '⚙️' },
+    { k: 'RAG 多模态库', d: 'go:raglib', i: '📚' },
+    { k: '本地状态', d: 'go:ops', i: '🩺' },
+    { k: '刷新全部状态', d: 'act:poll', i: '↻' },
+    { k: '测试全部模型连接', d: 'act:probe', i: '🔍' }
+  ];
+  let palSel = 0;
+  function togglePalette(force) {
+    const p = $('#palette');
+    const open = force !== undefined ? force : !p.classList.contains('open');
+    p.classList.toggle('open', open);
+    if (open) { $('#palInput').value = ''; palSel = 0; filterPalette(); setTimeout(() => $('#palInput').focus(), 30); }
+  }
+  function filterPalette() {
+    const q = $('#palInput').value.trim().toLowerCase();
+    const items = PAL_COMMANDS.filter(c => !q || c.k.toLowerCase().includes(q));
+    const list = $('#palList');
+    list.innerHTML = '';
+    palSel = Math.min(palSel, Math.max(0, items.length - 1));
+    items.forEach((c, i) => {
+      const it = el('div', { class: 'palette-item' + (i === palSel ? ' sel' : ''), onclick: () => runPalette(c) },
+        el('span', { class: 'ico' }, c.i), el('span', null, c.k));
+      list.appendChild(it);
+    });
+    list._items = items;
+  }
+  function palKey(e) {
+    const items = $('#palList')._items || [];
+    if (e.key === 'ArrowDown') { palSel = Math.min(palSel + 1, items.length - 1); filterPalette(); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { palSel = Math.max(palSel - 1, 0); filterPalette(); e.preventDefault(); }
+    else if (e.key === 'Enter') { const c = items[palSel]; if (c) runPalette(c); }
+    else if (e.key === 'Escape') togglePalette(false);
+  }
+  function runPalette(c) {
+    togglePalette(false);
+    if (c.d.startsWith('go:')) go(c.d.slice(3));
+    else if (c.d === 'act:poll') { pollStatus(); toast('状态已刷新'); }
+    else if (c.d === 'act:probe') Models.probeAll();
+  }
+
+  /* ── Boot ── */
+  document.addEventListener('DOMContentLoaded', () => {
+    $$('#sidenav .nav-item').forEach(b => b.addEventListener('click', () => go(b.dataset.view)));
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); togglePalette(); }
+      else if (e.key === 'Escape') { closeDrawer(); togglePalette(false); }
+      else if (!e.ctrlKey && !e.metaKey && !e.altKey && /^[1-8]$/.test(e.key) &&
+               !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+        go(VIEWS[Number(e.key) - 1]);
+      }
+    });
+    const clock = () => { $('#sbClock').textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false }); };
+    clock(); setInterval(clock, 1000);
+    const h = (location.hash || '').replace('#', '');
+    go(VIEWS.includes(h) ? h : 'dashboard');
+    pollStatus();
+    setInterval(pollStatus, 20000);
+  });
+
+  return { $, $$, req, get, post, postForm, del, upload, esc, el, fmtTime, fmtDT, fmtSize, fmtMoney,
+           safeArr, toast, renderPager, renderEmpty, renderSkelList, stateTag, jsonPre,
+           go, store: Store, pollStatus, refreshCounters,
+           openDrawer, closeDrawer, togglePalette, filterPalette, palKey };
+})();
+
+/* ============================================================
+   Dashboard · 经营仪表盘
+   ============================================================ */
+const Dashboard = (() => {
+  const { $, get, el, fmtTime, stateTag, fmtMoney, safeArr, renderEmpty } = Suite;
+
+  async function load() {
+    try {
+      const [inbox, orders, fly, ragDocs, models, v12] = await Promise.all([
+        get('/v1/mail/inbox', { limit: 500 }).catch(() => ({ items: [] })),
+        get('/v1/orders', { page: 1, page_size: 100 }).catch(() => ({ items: [], total: 0 })),
+        get('/v1/flywheel/stats').catch(() => ({})),
+        get('/v1/rag/docs').catch(() => ({ docs: [], count: 0 })),
+        get('/v1/models/config').catch(() => ({ config: { models: {} }, probe: {} })),
+        get('/v1/v12/status').catch(() => ({}))
+      ]);
+      const mailItems = safeArr(inbox.items);
+      const hitl = mailItems.filter(m => (m.pending?.state || '').toUpperCase() === 'HITL').length;
+      const ordItems = safeArr(orders.items);
+      const openOrders = ordItems.filter(o => !['DONE', 'CLOSED', 'WON', 'LOST'].includes(String(o.state).toUpperCase())).length;
+      const modelsObj = models.config?.models || {};
+      const probe = models.probe || {};
+      const mKeys = Object.keys(modelsObj);
+      const mOnline = mKeys.filter(k => probe[k]?.online).length;
+      const ragN = (ragDocs.count ?? safeArr(ragDocs.docs).length);
+
+      const kpis = [
+        { lbl: '🛡 HITL 待批', val: hitl, sub: `收件箱共 ${mailItems.length} 封`, cls: hitl > 0 ? 'warn' : 'ok' },
+        { lbl: '📋 在办订单', val: openOrders, sub: `总订单 ${orders.total ?? ordItems.length}`, cls: openOrders > 0 ? 'acc' : '' },
+        { lbl: '🏢 客户沙箱', val: fly.total_customers ?? 0, sub: `报价 ${fly.total_quotes ?? 0} · 胜率 ${Math.round((fly.overall_win_rate ?? 0) * 100)}%`, cls: '' },
+        { lbl: '📚 RAG 文档', val: ragN, sub: 'Embed-1B 已索引', cls: '' },
+        { lbl: '⚙️ 模型在线', val: mOnline + '/' + mKeys.length, sub: mKeys.join(' '), cls: mOnline === mKeys.length && mKeys.length ? 'ok' : (mOnline ? 'warn' : 'err') },
+        { lbl: '🧱 内核报价', val: v12.calc_quote_total ?? 0, sub: `p50 ${v12.calc_quote_p50_ms ?? '—'}ms · span ${v12.span_count ?? 0}`, cls: v12.kernel_online ? 'ok' : 'warn' }
+      ];
+      const kg = $('.grid.k6#dashKpis');
+      kg.innerHTML = '';
+      kpis.forEach(k => kg.appendChild(el('div', { class: 'kpi ' + (k.cls || '') },
+        el('div', { class: 'lbl' }, k.lbl),
+        el('div', { class: 'val' }, String(k.val)),
+        el('div', { class: 'sub' }, k.sub || ' '))));
+
+      // 最近订单
+      const ob = $('#dashOrders');
+      ob.innerHTML = '';
+      if (!ordItems.length) {
+        renderEmpty(ob, '📭', '暂无订单', '客户邮件经 puller/上传进入收件箱后, 后台 orchestrator 将自动生成 RFQ 订单。');
+      } else {
+        ordItems.slice(0, 12).forEach(o => {
+          const row = el('div', { class: 'draw-item', onclick: () => { Suite.go('orders'); setTimeout(() => Orders.openDrawer(o.context_id), 120); } },
+            el('div', { class: 'fi' }, '📋'),
+            el('div', { class: 'nm' },
+              el('div', { class: 'n' }, o.context_id + ' · ' + (o.customer_name || o.customer_id || '—')),
+              el('div', { class: 'm' }, (o.material || '—') + ' × ' + (o.quantity ?? '—') + ' · ' + fmtMoney(o.final_price, o.currency) + ' · ' + fmtTime(o.mtime))),
+            stateTag(o.state));
+          ob.appendChild(row);
+        });
+      }
+
+      // 提示
+      const notes = $('#dashNotes');
+      notes.innerHTML = '';
+      const li = [
+        ['铁律①', '报价与 DFM 全部由确定性内核计算, LLM 只做抽取/起草/摘要, 不裁决数字。', 'warn-text'],
+        ['离线优先', '所有客户数据只落本地 SQLite/JSON, 不出网; 联网检索走本地 SearXNG。', ''],
+        ['HITL', '门禁 BLOCKED/需审批的订单进入待批队列, 批准后才允许回函。', ''],
+        ['快捷键', 'Ctrl+K 命令面板 · 1-8 切换视图 · Esc 关闭弹层。', ''],
+        ['当前链路', `API 在线 · 内核 ${v12.kernel_online ? '在线' : '离线(vendored 兜底)'} · Embed ${probe.embedding?.online ? '在线' : '离线'}`, '']
+      ];
+      li.forEach(([t, d, cls]) => notes.appendChild(
+        el('div', { class: cls }, '▸ ' + t + ' — ' + d)));
+      $('.dashTs, #dashTs').textContent = '刷新于 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
+
+      Suite.store.counters.mailTotal = mailItems.length;
+      Suite.store.counters.mailHitl = hitl;
+      Suite.store.counters.orderTotal = orders.total ?? ordItems.length;
+      Suite.store.counters.ragTotal = ragN;
+      Suite.store.counters.modelsOnline = mOnline;
+      Suite.store.counters.modelsTotal = mKeys.length;
+      Suite.refreshCounters();
+    } catch (e) {
+      Suite.toast('仪表盘加载失败: ' + e.message, 'err');
+    }
+  }
+  return { load, refresh: load };
+})();
+
+/* ============================================================
+   Inbox · 客户邮箱 (列表 + 筛选 + 分页 + 批量 + 7 区上下文)
+   ============================================================ */
+const Inbox = (() => {
+  const { $, get, upload, post, el, fmtTime, fmtDT, stateTag, safeArr,
+          renderEmpty, renderSkelList, renderPager, esc, jsonPre } = Suite;
+  let all = [], filtered = [], page = 1, perPage = 20, seg = 'all', q = '';
+  let sel = new Set(), current = null, ctxCache = {};
+
+  async function refresh() {
+    renderSkelList($('#inboxList'), 6);
+    try {
+      const r = await get('/v1/mail/inbox', { limit: 500 });
+      all = safeArr(r.items).map(m => ({ ...m, _state: (m.pending?.state || 'NEW').toUpperCase() }));
+      $('#inboxSrc').textContent = 'source: ' + (r.source || 'local');
+    } catch (e) {
+      all = [];
+      renderEmpty($('#inboxList'), '📭', '暂无邮件', '连接 Gmail IMAP(设置中显式开启)或上传 .eml 后将自动出现。',
+        el('button', { class: 'btn primary', onclick: uploadEml }, '⬆ 上传 .eml'));
+    }
+    Suite.store.counters.mailTotal = all.length;
+    Suite.store.counters.mailHitl = all.filter(m => m._state === 'HITL').length;
+    Suite.refreshCounters();
+    applyFilter();
+  }
+
+  function applyFilter() {
+    q = $('#inboxQ').value.trim().toLowerCase();
+    perPage = parseInt($('#inboxPagesize')?.value || '20', 10) || 20;
+    const counts = {};
+    all.forEach(m => { counts[m._state] = (counts[m._state] || 0) + 1; });
+    ['all', 'HITL', 'NEW', 'BLOCKED', 'DONE'].forEach(k => {
+      const n = $('body').querySelector('#segN-' + k);
+      if (n) n.textContent = k === 'all' ? all.length : (counts[k] || 0);
+    });
+    filtered = all.filter(m => {
+      if (seg !== 'all' && m._state !== seg) return false;
+      if (q) {
+        const s = ((m.subject || '') + ' ' + (m.from || '') + ' ' + (m.mail_id || '')).toLowerCase();
+        if (!s.includes(q)) return false;
+      }
+      return true;
+    });
+    page = 1;
+    render();
+  }
+
+  function setSeg(f, btn) {
+    seg = f;
+    btn.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+    applyFilter();
+  }
+
+  function render() {
+    const list = $('#inboxList');
+    $('#inboxTotal').textContent = `${filtered.length}/${all.length} 封`;
+    list.innerHTML = '';
+    if (!filtered.length) {
+      renderEmpty(list, all.length ? '🔍' : '📭',
+        all.length ? '没有匹配的邮件' : '收件箱为空',
+        all.length ? '调整筛选条件或清空搜索词试试。' : 'Gmail 拉信默认关闭; 可上传本地 .eml 触发黄金链。',
+        all.length ? el('button', { class: 'btn', onclick: () => { $('#inboxQ').value = ''; applyFilter(); } }, '清空搜索')
+                   : el('button', { class: 'btn primary', onclick: uploadEml }, '⬆ 上传 .eml'));
+      renderPager($('#inboxPager'), 0, 1, perPage, () => {});
+      return;
+    }
+    const start = (page - 1) * perPage;
+    filtered.slice(start, start + perPage).forEach(m => list.appendChild(row(m)));
+    renderPager($('#inboxPager'), filtered.length, page, perPage, p => { page = p; render(); });
+  }
+
+  function row(m) {
+    const id = m.mail_id;
+    const selIt = sel.has(id);
+    const r = el('div', { class: 'mail-item' + (selIt ? ' sel' : '') + (current === id ? ' active' : ''),
+      onclick: () => open(id) },
+      el('input', { type: 'checkbox', class: 'checkbox', style: 'margin-top:3px',
+        checked: selIt, onclick: e => { e.stopPropagation(); toggle(id); } }),
+      el('div', { class: 'body' },
+        el('div', { class: 'l1' }, esc(m.subject || '(无主题)')),
+        el('div', { class: 'l2' }, esc(m.from || m.sender || '—')),
+        el('div', { class: 'l3' },
+          stateTag(m._state),
+          m.pending?.driver && m.pending.driver !== 'email' ? el('span', { class: 'tag violet' }, 'via ' + esc(m.pending.driver)) : null,
+          m.pending?.attempts ? el('span', { class: 'tag' }, '尝试 ' + m.pending.attempts) : null,
+          (m.attachments_count || 0) > 0 ? el('span', { class: 'tag cyan' }, '📎 ' + m.attachments_count) : null,
+          el('span', { style: 'margin-left:auto' }, fmtTime(m.received_at)))));
+    return r;
+  }
+
+  function toggle(id) { sel.has(id) ? sel.delete(id) : sel.add(id); updateBatch(); render(); }
+  function clearSel() { sel.clear(); updateBatch(); render(); }
+  function updateBatch() {
+    $('#inboxBatch').classList.toggle('show', sel.size > 0);
+    $('#inboxBatchN').textContent = sel.size;
+  }
+
+  async function batch(action) {
+    if (!sel.size) return Suite.toast('未选择邮件', 'warn');
+    const ids = Array.from(sel);
+    const label = action === 'delete' ? '删除' : '重跑(追加 pending NEW)';
+    if (action === 'delete' && !confirm(`确定删除 ${ids.length} 封本地邮件? 该操作不可恢复。`)) return;
+    try {
+      const r = await post('/v1/mail/batch', { ids, action });
+      Suite.toast(`${label} 完成: ${r.done_count}/${ids.length}` + (r.skipped?.length ? ` · 跳过 ${r.skipped.length}` : ''), r.done_count ? 'ok' : 'err');
+      sel.clear(); updateBatch();
+      await refresh();
+    } catch (e) { Suite.toast('批量操作失败: ' + e.message, 'err'); }
+  }
+
+  async function open(id) {
+    current = id;
+    $$('#inboxList .mail-item').forEach(x => x.classList.remove('active'));
+    ctxCache = {};
+    let m;
+    try { m = await get('/v1/mail/' + encodeURIComponent(id)); }
+    catch (e) {
+      $('#inboxDetail').innerHTML = '';
+      Suite.renderEmpty($('#inboxDetail'), '⚠️', '邮件详情加载失败', e.message);
+      return;
+    }
+    if (m.pending?.context_id) ctxCache['_traceCid'] = m.pending.context_id;
+    render();
+    renderDetail(m);
+  }
+
+  function renderDetail(m) {
+    const d = $('#inboxDetail');
+    d.innerHTML = '';
+    $('#inboxDetailTitle').textContent = '📨 ' + (m.subject || '(无主题)');
+    $('#inboxDetailActs').innerHTML = '';
+    const p = m.pending || all.find(x => x.mail_id === m.mail_id)?.pending;
+    d.appendChild(el('div', { class: 'detail-hd' },
+      el('div', { class: 'badges' },
+        p ? stateTag((p.state || '').toUpperCase()) : null,
+        p?.context_id ? el('span', { class: 'tag mono', title: '点击查看 trace', onclick: () => Orders.showTrace(p.context_id) }, '🔗 ' + esc(p.context_id)) : null,
+        (m.size_bytes != null) ? el('span', { class: 'tag mono' }, Suite.fmtSize(m.size_bytes)) : null),
+      el('div', { class: 'from' }, '发件人 ' + esc(m.from || '—') + ' · 收件 ' + fmtDT(m.received_at) + ' · mail_id ' + esc(m.mail_id || ''))));
+
+    // 7 区上下文 tabs
+    const CTX = [
+      ['customer', '🏢 客户'], ['geometry', '📐 图纸'], ['rag', '🧠 RAG'],
+      ['pending', '✅ 未办'], ['verification', '🛡 门禁'], ['commercial', '💰 成本'],
+      ['postmortem', '📈 复盘'], ['trace', '🔗 Trace'], ['hitl', '🛡 HITL']
+    ];
+    const sec = el('div', { class: 'detail-sec' },
+      el('h4', null, '7 区上下文 (服务端聚合)'),
+      el('div', { class: 'ctx-tabs' }, CTX.map(([k, l]) =>
+        el('button', { onclick: ev => { ev.target.parentNode.querySelectorAll('button').forEach(b => b.classList.remove('active')); ev.target.classList.add('active'); loadCtx(m.mail_id, k); } }, l))));
+    d.appendChild(sec);
+    d.appendChild(el('div', { id: 'ctxOut', class: 'hint-inline' }, '点击上方标签加载对应上下文区…'));
+
+    // 正文
+    d.appendChild(el('div', { class: 'detail-sec' },
+      el('h4', null, '📝 邮件正文'),
+      el('div', { class: 'mail-body' }, esc(m.body || m.text || '(正文为空)'))));
+
+    // 附件
+    const atts = safeArr(m.attachments_detail?.length ? m.attachments_detail : m.attachments);
+    if (atts.length) d.appendChild(el('div', { class: 'detail-sec' },
+      el('h4', null, '📎 附件 (' + atts.length + ')'),
+      el('div', { class: 'flex' }, atts.map(a =>
+        el('span', { class: 'tag cyan' }, '📎 ' + esc(a.name || a) + (a.kind ? ' · ' + a.kind : ''))))));
+
+    // 原文
+    d.appendChild(el('div', { class: 'detail-sec' },
+      el('h4', null, '📦 解析元数据'),
+      jsonPre({ mail_id: m.mail_id, path: m.path, size_bytes: m.size_bytes, received_at: m.received_at,
+                attachments: m.attachments, pending: p || null })));
+  }
+
+  async function loadCtx(mid, kind) {
+    const out = $('#ctxOut');
+    out.innerHTML = '<div class="loading-inline"><div class="spinner"></div>加载 ' + kind + ' 区…</div>';
+    try {
+      const r = kind === 'trace'
+        ? await get('/v1/traces/' + encodeURIComponent(ctxCache['_traceCid'] || mid))
+        : await get(`/v1/mail/${encodeURIComponent(mid)}/context/${kind}`);
+      ctxCache[kind] = r;
+      out.innerHTML = '';
+      const box = el('div', { class: 'detail-sec' });
+      box.appendChild(el('h4', null, '上下文 · ' + kind));
+      box.appendChild(jsonPre(r));
+      // 快捷洞察: RAG 区可一键跳到洞察页
+      if (kind === 'rag') box.appendChild(el('div', { class: 'row mt8' },
+        el('button', { class: 'btn sm', onclick: () => { $('#insQ').value = (r.query || '').slice(0, 120); Suite.go('insight'); } }, '🧠 在洞察页深挖')));
+      out.appendChild(box);
+    } catch (e) {
+      out.innerHTML = '';
+      Suite.renderEmpty(out, '🕳', '上下文不可用', e.message + (e.status === 404 ? ' (该区无绑定数据)' : ''));
+    }
+  }
+
+  /* ── 上传 .eml ── */
+  function uploadEml() { $('#inboxFile').click(); }
+  async function onUploadEml(ev) {
+    const f = ev.target.files[0];
+    if (!f) return;
+    Suite.toast('上传 ' + f.name + ' 解析中…', 'ok', 2000);
+    try {
+      const fd = new FormData();
+      fd.append('file', f);
+      await upload('/v1/upload/email', fd);
+      Suite.toast('已入收件箱, 可触发后续链路', 'ok');
+      ev.target.value = '';
+      refresh();
+    } catch (e) { Suite.toast('上传失败: ' + e.message, 'err'); }
+  }
+
+  return { refresh, applyFilter, setSeg, batch, clearSel, toggle: t => toggle(t), open,
+           uploadEml, onUploadEml, load: refresh,
+           get filtered() { return filtered; } };
+})();
+
+/* ============================================================
+   Orders · 订单 / RFQ (服务端分页 · 筛选 · 批量 · CSV · Trace)
+   ============================================================ */
+const Orders = (() => {
+  const { $, get, post, el, fmtDT, fmtTime, stateTag, fmtMoney, safeArr,
+          renderEmpty, renderPager, esc, jsonPre, openDrawer, toast } = Suite;
+  let page = 1, pageSize = 20, total = 0, seg = '', q = '', cust = '', sort = 'mtime_desc';
+  let rows = [], sel = new Set(), debounceT = null, custOptions = [];
+
+  async function refresh(keepPage) {
+    try {
+      const r = await get('/v1/orders', { page, page_size: pageSize, q, state: seg, customer_id: cust, sort });
+      rows = safeArr(r.items);
+      total = r.total ?? rows.length;
+      page = r.page ?? page;
+      if (!custOptions.length) {
+        custOptions = [...new Set(await allCustomerIds())];
+        const s = $('#ordCust');
+        s.innerHTML = '<option value="">所有客户</option>' +
+          custOptions.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+        s.value = cust;
+      }
+      $('#ordTotal').textContent = `共 ${total} 条`;
+      Suite.store.counters.orderTotal = total;
+      Suite.refreshCounters();
+      render();
+    } catch (e) {
+      $('#ordTbody').innerHTML = '';
+      toast('订单加载失败: ' + e.message, 'err');
+    }
+  }
+  async function allCustomerIds() {
+    try { const r = await get('/v1/orders', { page: 1, page_size: 100 }); return safeArr(r.items).map(o => o.customer_id).filter(Boolean); }
+    catch { return []; }
+  }
+
+  function debouncedSearch() {
+    clearTimeout(debounceT);
+    debounceT = setTimeout(() => { q = $('#ordQ').value.trim(); page = 1; refresh(); }, 260);
+  }
+  function setSeg(f, btn) {
+    seg = f; page = 1;
+    btn.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+    refresh();
+  }
+
+  function render() {
+    const tb = $('#ordTbody');
+    tb.innerHTML = '';
+    if (!rows.length) {
+      const tr = el('tr', null, el('td', { colspan: '10', style: 'padding:0' },
+        renderEmptyBox()));
+      tb.appendChild(tr);
+      renderPager($('#ordPager'), 0, 1, pageSize, () => {});
+      return;
+    }
+    rows.forEach(o => {
+      const isSel = sel.has(o.context_id);
+      const tr = el('tr', { class: isSel ? 'sel' : '', onclick: () => openOrderDrawer(o.context_id) },
+        el('td', { onclick: e => { e.stopPropagation(); toggle(o.context_id); } },
+          el('input', { type: 'checkbox', class: 'checkbox', checked: isSel })),
+        el('td', { class: 'mono', title: o.context_id }, o.context_id),
+        el('td', null, stateTag(o.state), (o.verification_status && o.verification_status !== o.state)
+          ? el('span', { class: 'tag', style: 'margin-left:5px' }, esc(o.verification_status)) : null),
+        el('td', null, esc(o.customer_name || o.customer_id || '—'),
+          o.country ? el('span', { class: 'tag', style: 'margin-left:5px' }, '🌐 ' + esc(o.country)) : null),
+        el('td', { class: 'wrap' }, esc(o.material || '—') + (o.quantity != null ? ' × ' + o.quantity : ''),
+          el('div', { class: 'faint mono', style: 'font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px' }, esc(o.subject || ''))),
+        el('td', { class: 'num' }, fmtMoney(o.unit_price, o.currency)),
+        el('td', { class: 'num' }, fmtMoney(o.final_price, o.currency)),
+        el('td', { class: 'num' }, o.margin_pct != null ? o.margin_pct + '%' : '—'),
+        el('td', { class: 'num' }, o.lead_time_days != null ? o.lead_time_days + 'd' : '—'),
+        el('td', { class: 'mono faint' }, fmtDT(o.mtime)));
+      tb.appendChild(tr);
+    });
+    renderPager($('#ordPager'), total, page, pageSize, p => { page = p; refresh(true); });
+  }
+
+  function renderEmptyBox() {
+    const box = el('div');
+    renderEmpty(box, '📋', '没有匹配的订单',
+      q || seg || cust ? '调整筛选条件, 或清空搜索。' : '客户邮件进入收件箱并被 orchestrator 处理后, 将在此生成 RFQ 订单。',
+      (q || seg || cust) ? el('button', { class: 'btn', onclick: () => { q = ''; seg = ''; cust = ''; $('#ordQ').value = ''; $('#ordCust').value = ''; $('#ordSeg').querySelector('button').click(); refresh(); } }, '清空筛选') : null);
+    return box;
+  }
+
+  function toggle(id) { sel.has(id) ? sel.delete(id) : sel.add(id); updateBatch(); render(); }
+  function clearSel() { sel.clear(); updateBatch(); render(); }
+  function updateBatch() {
+    $('#ordBatch').classList.toggle('show', sel.size > 0);
+    $('#ordBatchN').textContent = sel.size;
+  }
+
+  async function batchCrmSync() {
+    if (!sel.size) return toast('未选择订单', 'warn');
+    let ok = 0, fail = 0;
+    for (const cid of sel) {
+      try { await post(`/v1/rfq/${encodeURIComponent(cid)}/crm-sync`, {}); ok++; }
+      catch { fail++; }
+    }
+    toast(`CRM 同步完成: 成功 ${ok}${fail ? ' · 失败 ' + fail : ''}`, fail ? 'warn' : 'ok');
+    sel.clear(); updateBatch();
+  }
+
+  function exportCsv(selectedOnly) {
+    const list = selectedOnly && sel.size ? rows.filter(r => sel.has(r.context_id)) : rows;
+    if (!list.length) return toast('无可导出行', 'warn');
+    const head = ['context_id', 'state', 'verification_status', 'customer_id', 'customer_name', 'country', 'material', 'quantity', 'unit_price', 'final_price', 'currency', 'margin_pct', 'lead_time_days', 'mtime', 'subject'];
+    const q = s => '"' + String(s ?? '').replace(/"/g, '""') + '"';
+    const csv = [head.join(',')].concat(list.map(o => head.map(k =>
+      q(k === 'mtime' && o[k] ? new Date(o[k] * 1000).toISOString() : o[k])).join(','))).join('\r\n');
+    const url = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv' }));
+    const a = el('a', { href: url, download: `orders-${new Date().toISOString().slice(0, 10)}.csv` });
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast(`已导出 ${list.length} 条`, 'ok');
+  }
+
+  async function openOrderDrawer(cid) {
+    const bd = el('div', { class: 'loading-inline' }, el('div', { class: 'spinner' }), '加载 context ' + cid + ' …');
+    openDrawer('📋 订单 ' + cid, bd);
+    try {
+      const [ctx, trace] = await Promise.all([
+        get('/v1/rfq/' + encodeURIComponent(cid)).catch(e => ({ _error: e.message })),
+        get('/v1/traces/' + encodeURIComponent(cid)).catch(() => null)
+      ]);
+      bd.innerHTML = '';
+      if (ctx._error) {
+        bd.appendChild(el('div', { class: 'empty' },
+          el('div', { class: 'ico' }, '🕳'), el('div', { class: 'ttl' }, 'context 读取失败'),
+          el('div', { class: 'desc' }, ctx._error)));
+      } else {
+        const com = ctx.commercial || {};
+        const quote = (com.quote || {});
+        const rfq = ctx.rfq || {};
+        bd.appendChild(el('div', { class: 'kv-grid mb8' },
+          kv('context_id', ctx.context_id || cid),
+          kv('state', ctx.state || '—'),
+          kv('customer', rfq.customer_name || ctx.customer?.name || ctx.customer?.customer_id || '—'),
+          kv('country', rfq.country || ctx.customer?.country || '—'),
+          kv('material', rfq.material || '—'),
+          kv('quantity', rfq.quantity ?? '—'),
+          kv('unit_price', fmtMoney(quote.unit_price, quote.currency)),
+          kv('final_price', fmtMoney(quote.final_price || quote.total_price, quote.currency)),
+          kv('margin', com.margin_pct != null ? com.margin_pct + '%' : '—'),
+          kv('verification', (ctx.decision || {}).status || '—')));
+        bd.appendChild(el('div', { class: 'row mb8' },
+          el('button', { class: 'btn sm', onclick: () => showTrace(cid) }, '🔗 Trace 明细'),
+          el('button', { class: 'btn sm', onclick: async () => { try { await post(`/v1/rfq/${encodeURIComponent(cid)}/crm-sync`, {}); toast('CRM 同步完成', 'ok'); } catch (e) { toast('CRM 同步失败: ' + e.message, 'err'); } } }, '⇄ CRM 同步')));
+      }
+      bd.appendChild(el('div', { class: 'detail-sec' }, el('h4', null, '📦 context 原文'), jsonPre(ctx)));
+      if (trace) bd.appendChild(el('div', { class: 'detail-sec mt12' }, el('h4', null, '🔗 Trace'), jsonPre(trace)));
+    } catch (e) { bd.innerHTML = ''; bd.textContent = '加载失败: ' + e.message; }
+  }
+  function kv(k, v) { return el('div', { class: 'kv' }, el('span', { class: 'k' }, k), el('span', { class: 'v' }, String(v))); }
+
+  async function showTrace(cid) {
+    const bd = el('div', { class: 'loading-inline' }, el('div', { class: 'spinner' }), '加载 trace…');
+    openDrawer('🔗 Trace · ' + cid, bd);
+    try {
+      const t = await get('/v1/traces/' + encodeURIComponent(cid));
+      bd.innerHTML = '';
+      const spans = safeArr(t.spans);
+      bd.appendChild(el('div', { class: 'hint-inline mb8' }, `${spans.length} 个 span · sha256_16 ${t.spans?.[0]?.sha256_16 || '—'}`));
+      bd.appendChild(jsonPre(t));
+    } catch (e) {
+      bd.innerHTML = '';
+      Suite.renderEmpty(bd, '🕳', 'Trace 不存在', e.message + (e.status === 404 ? ' (该订单尚未生成 trace)' : ''));
+    }
+  }
+
+  return { refresh, load: refresh, debouncedSearch, setSeg, batchCrmSync, exportCsv,
+           clearSel, toggle, openDrawer: openOrderDrawer, showTrace };
+})();
+
+/* ============================================================
+   Drawings · STEP 图纸库 (搜索 · 分页 · 上传 · SVG 预览 · RAG)
+   ============================================================ */
+const Drawings = (() => {
+  const { $, get, upload, el, fmtTime, fmtSize, safeArr, renderEmpty, renderSkelList, renderPager, esc, toast, jsonPre } = Suite;
+  let all = [], filtered = [], page = 1, pageSize = 20, q = '', sel = new Set(), current = null;
+
+  async function refresh() {
+    renderSkelList($('#drawList'), 5);
+    try {
+      const r = await get('/v1/drawings', { page: 1, page_size: 200, q: '' });
+      all = safeArr(r.items);
+      Suite.store.counters.drawTotal = r.total ?? all.length;
+      Suite.refreshCounters();
+    } catch (e) {
+      all = [];
+      toast('图纸库加载失败: ' + e.message, 'err');
+    }
+    applyFilter();
+  }
+
+  function applyFilter() {
+    q = $('#drawQ').value.trim().toLowerCase();
+    filtered = all.filter(d => !q || (d.id + ' ' + d.name).toLowerCase().includes(q));
+    page = 1;
+    render();
+  }
+
+  function render() {
+    const list = $('#drawList');
+    $('#drawTotal').textContent = `${filtered.length}/${all.length} 件`;
+    list.innerHTML = '';
+    if (!filtered.length) {
+      renderEmpty(list, '📐', all.length ? '没有匹配的图纸' : '图纸库为空',
+        all.length ? '换个文件名或 sha256 前缀试试。' : '上传 .step/.stp 后服务端将渲染等距投影 SVG 并缓存。',
+        el('button', { class: 'btn primary', onclick: () => $('#drawFile').click() }, '📥 上传 STEP'));
+      renderPager($('#drawPager'), 0, 1, pageSize, () => {});
+      return;
+    }
+    const start = (page - 1) * pageSize;
+    filtered.slice(start, start + pageSize).forEach(d => list.appendChild(row(d)));
+    renderPager($('#drawPager'), filtered.length, page, pageSize, p => { page = p; render(); });
+  }
+
+  function row(d) {
+    return el('div', { class: 'draw-item' + (current === d.id ? ' active' : ''), onclick: () => open(d.id) },
+      el('div', { class: 'fi' }, '📐'),
+      el('div', { class: 'nm' },
+        el('div', { class: 'n' }, esc(d.name)),
+        el('div', { class: 'm' }, fmtSize(d.size_bytes) + ' · ' + fmtTime(d.mtime) + (d.has_thumb ? ' · ⚡缓存' : ''))),
+      el('span', { class: 'tag mono', title: 'sha256_16' }, d.sha256_16.slice(0, 8)));
+  }
+
+  async function open(id) {
+    current = id;
+    render();
+    const d = all.find(x => x.id === id);
+    if (!d) return;
+    $('#drawViewerSub').textContent = d.name;
+    const v = $('#drawViewer');
+    v.innerHTML = '<div class="loading-inline"><div class="spinner"></div>渲染缩略图…</div>';
+    try {
+      const svg = await Suite.req('GET', `/v1/drawings/${encodeURIComponent(id)}/thumbnail`);
+      v.innerHTML = '';
+      if (typeof svg === 'string' && svg.includes('<svg')) {
+        const clean = svg.replace(/<script[\s\S]*?<\/script>/gi, '');
+        v.appendChild(el('div', { html: clean }));
+      } else {
+        v.appendChild(el('div', { class: 'placeholder' }, '🧊<br/>引擎未返回可用 SVG'));
+      }
+    } catch (e) {
+      v.innerHTML = '';
+      v.appendChild(el('div', { class: 'placeholder' }, '🧊<br/>缩略图渲染失败: ' + esc(e.message) +
+        '<br/><span style="font-size:10px">几何引擎离线时降级, 不阻断其他操作</span>'));
+    }
+    // 元数据
+    const meta = $('#drawMeta');
+    meta.innerHTML = '';
+    meta.appendChild(el('div', { class: 'kv-grid' },
+      el('div', { class: 'kv' }, el('span', { class: 'k' }, '文件名'), el('span', { class: 'v' }, esc(d.name))),
+      el('div', { class: 'kv' }, el('span', { class: 'k' }, '大小'), el('span', { class: 'v' }, fmtSize(d.size_bytes))),
+      el('div', { class: 'kv' }, el('span', { class: 'k' }, 'sha256_16'), el('span', { class: 'v' }, d.sha256_16)),
+      el('div', { class: 'kv' }, el('span', { class: 'k' }, '上传时间'), el('span', { class: 'v' }, fmtTime(d.mtime)))));
+    $('#drawDfm').innerHTML = '';
+    $('#drawDfm').appendChild(el('div', { class: 'hint-inline' },
+      '点击「检索」可基于该图纸文件名/客户做工艺 RAG; 上传后 DFM 特征由服务端 OCP 抽取 (bbox/体积/特征数) 写入 SVG 标注。'));
+    // 预填检索词
+    if (!$('#drawRagQ').value) $('#drawRagQ').value = d.name.replace(/\.[^.]+$/, '').split(/[-_]/).slice(0, 4).join(' ');
+  }
+
+  /* ── 上传 (拖拽 + 点击) ── */
+  function bindDrop() {
+    const dz = $('#drawDrop'), fi = $('#drawFile');
+    dz.addEventListener('click', () => fi.click());
+    ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('over'); }));
+    dz.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) uploadStep(f); });
+    fi.addEventListener('change', e => { const f = e.target.files[0]; if (f) uploadStep(f); e.target.value = ''; });
+  }
+
+  async function uploadStep(file) {
+    if (!/\.(step|stp)$/i.test(file.name)) return toast('仅支持 .step/.stp', 'warn');
+    if (file.size > 20 * 1024 * 1024) return toast('文件超过 20MB 上限', 'err');
+    toast('上传 ' + file.name + ' · OCP 几何解析中…', 'ok', 2500);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const r = await upload('/v1/upload/step-with-thumbnail', fd);
+      // 立即渲染返回的 svg
+      const v = $('#drawViewer');
+      v.innerHTML = '';
+      if (r.svg) v.appendChild(el('div', { html: r.svg.replace(/<script[\s\S]*?<\/script>/gi, '') }));
+      else v.appendChild(el('div', { class: 'placeholder' }, '🧊<br/>服务端未返回 SVG'));
+      const meta = $('#drawMeta');
+      meta.innerHTML = '';
+      meta.appendChild(el('div', { class: 'kv-grid' },
+        kv('文件名', r.filename || file.name),
+        kv('bbox', r.bbox ? `${(r.bbox.x_max - r.bbox.x_min).toFixed(1)}×${(r.bbox.y_max - r.bbox.y_min).toFixed(1)}×${(r.bbox.z_max - r.bbox.z_min).toFixed(1)} mm` : '—'),
+        kv('体积', r.volume_cm3 != null ? r.volume_cm3 + ' cm³' : '—'),
+        kv('质量', r.mass_g != null ? r.mass_g + ' g' : '—'),
+        kv('特征数', r.features_count ?? '—'),
+        kv('sha256_16', r.sha256_16 || '—'),
+        kv('数据源', r._source || '—')));
+      $('#drawDfm').innerHTML = '';
+      $('#drawDfm').appendChild(el('div', { class: 'hint-inline' },
+        `几何摘要由确定性内核计算${r.cached ? ' (命中缓存, byte-identical)' : ''} · 铁律①: DFM 与报价不经 LLM 裁决。`));
+      toast('解析完成 · 已入图纸库', 'ok');
+      refresh();
+    } catch (e) { toast('上传失败: ' + e.message, 'err'); }
+  }
+  function kv(k, v) { return el('div', { class: 'kv' }, el('span', { class: 'k' }, k), el('span', { class: 'v' }, String(v))); }
+
+  /* ── 图纸 RAG / 联网 ── */
+  async function rag() {
+    const q = $('#drawRagQ').value.trim();
+    const out = $('#drawRagOut');
+    if (!q) return toast('请输入检索词', 'warn');
+    out.innerHTML = '<div class="loading-inline"><div class="spinner"></div>检索中 (Embed-1B)…</div>';
+    try {
+      const r = await get('/v1/rag/search', { q, limit: 5 });
+      out.innerHTML = '';
+      const hits = safeArr(r.hits);
+      out.appendChild(el('div', { class: 'faint mono', style: 'font-size:10px;margin-bottom:6px' },
+        'embed: ' + (r.embed_source || '—')));
+      if (!hits.length) {
+        Suite.renderEmpty(out, '🕳', '未命中', '本地知识库无匹配内容, 可前往「RAG 库」入库, 或试试联网检索。');
+        return;
+      }
+      hits.forEach(h => out.appendChild(hitCard(h, h.score)));
+    } catch (e) {
+      out.innerHTML = '';
+      Suite.renderEmpty(out, '⚠️', '检索失败', e.message + ' · 请检查 Embedding 模型是否在线(模型设置 → 测试连接)');
+    }
+  }
+  async function web() {
+    const q = $('#drawWebQ').value.trim();
+    const out = $('#drawWebOut');
+    if (!q) return toast('请输入查询词', 'warn');
+    out.innerHTML = '<div class="loading-inline"><div class="spinner"></div>联网检索中…</div>';
+    try {
+      const r = await get('/v1/web/search', { q, num: 5, category: 'general' });
+      out.innerHTML = '';
+      const hits = safeArr(r.hits);
+      out.appendChild(el('div', { class: 'faint mono', style: 'font-size:10px;margin-bottom:6px' },
+        'source: ' + (r._source || '—') + (r.mock ? ' · MOCK' : '')));
+      if (r.warning) out.appendChild(el('div', { class: 'hit' }, el('div', { class: 'snip warn-text' }, '⚠ ' + esc(r.warning))));
+      if (!hits.length) {
+        Suite.renderEmpty(out, '🌐', '无结果', 'SearXNG 不可达或查询无结果; 本地 SearXNG 启动后重试。');
+        return;
+      }
+      hits.forEach(h => {
+        out.appendChild(el('div', { class: 'hit' },
+          el('div', { class: 'hd' }, '🌐', el('span', { class: 'doc' }, el('a', { href: h.url || '#', target: '_blank', rel: 'noopener' }, esc(h.title || h.url || '—')))),
+          el('div', { class: 'snip' }, esc(h.snippet || '')),
+          el('div', { class: 'src' }, esc(h.engine || '') + ' · ' + esc((h.url || '').slice(0, 80)))));
+      });
+    } catch (e) {
+      out.innerHTML = '';
+      Suite.renderEmpty(out, '⚠️', '联网检索失败', e.message);
+    }
+  }
+  function hitCard(h, score) {
+    const payload = h.payload || h;
+    return el('div', { class: 'hit' },
+      el('div', { class: 'hd' }, '📄', el('span', null, esc(h.id || payload.id || h.doc_id || '—')),
+        score != null ? el('span', { class: 'score' }, 'sim ' + Number(score).toFixed(3)) : null),
+      el('div', { class: 'doc' }, esc(payload.title || payload.heading || payload.case_id || '')),
+      el('div', { class: 'snip' }, esc(payload.snippet || payload.text || payload.note || '').slice(0, 400)),
+      el('div', { class: 'src' }, [payload.customer_id ? '🏷 ' + esc(payload.customer_id) : '',
+        payload.embed_source ? 'embed: ' + esc(payload.embed_source) : ''].filter(Boolean).join(' · ')));
+  }
+
+  return { refresh, load: () => { refresh(); }, applyFilter, open, bindDrop, rag, web };
+})();
+
+/* ============================================================
+   Insight · 客户洞察 (RAG + 联网 双源)
+   ============================================================ */
+const Insight = (() => {
+  const { $, get, el, safeArr, esc } = Suite;
+
+  async function run(webOnly) {
+    const q = $('#insQ').value.trim();
+    if (!q) return Suite.toast('请输入查询问题', 'warn');
+    const cust = $('#insCust').value.trim();
+    const limit = $('#insLimit').value;
+    $('#insRagSrc').textContent = '检索中…';
+    $('#insWebSrc').textContent = '检索中…';
+    $('#insRagOut').innerHTML = '<div class="loading-inline"><div class="spinner"></div>Embed-1B 语义检索…</div>';
+    $('#insWebOut').innerHTML = '<div class="loading-inline"><div class="spinner"></div>SearXNG 联网检索…</div>';
+
+    get('/v1/rag/search', { q, customer_id: cust, limit }).then(r => {
+      $('#insRagSrc').textContent = 'embed: ' + (r.embed_source || '—');
+      const hits = safeArr(r.hits);
+      if (!hits.length) {
+        Suite.renderEmpty($('#insRagOut'), '🕳', '未命中', '本地知识库无匹配内容。可前往「RAG 多模态库」入库相关文档。');
+        return;
+      }
+      const box = $('#insRagOut');
+      box.innerHTML = '';
+      hits.forEach(h => box.appendChild(el('div', { class: 'hit' },
+        el('div', { class: 'hd' }, '📄', el('span', null, esc(h.id || h.doc_id || '—')),
+          h.score != null ? el('span', { class: 'score' }, 'sim ' + Number(h.score).toFixed(3)) : null),
+        el('div', { class: 'doc' }, esc((h.payload || {}).title || (h.payload || {}).case_id || (h.payload || {}).heading || '')),
+        el('div', { class: 'snip' }, esc((h.payload || {}).snippet || (h.payload || {}).text || (h.payload || {}).note || '').slice(0, 500)),
+        el('div', { class: 'src' }, [(h.payload || {}).customer_id ? '🏷 ' + esc((h.payload || {}).customer_id) : '', (h.payload || {}).embed_source ? 'embed: ' + esc((h.payload || {}).embed_source) : ''].filter(Boolean).join(' · ')))));
+    }).catch(e => {
+      $('#insRagSrc').textContent = '不可用';
+      Suite.renderEmpty($('#insRagOut'), '⚠️', 'RAG 检索失败', e.message);
+    });
+
+    if (!webOnly) webRun(q);
+  }
+  async function webOnly() {
+    const q = $('#insQ').value.trim();
+    if (!q) return Suite.toast('请输入查询问题', 'warn');
+    $('#insRagOut').innerHTML = '<div class="hint-inline" style="padding:26px">已跳过本地 RAG (仅联网模式)。</div>';
+    webRun(q);
+  }
+  async function webRun(q) {
+    $('#insWebOut').innerHTML = '<div class="loading-inline"><div class="spinner"></div>SearXNG…</div>';
+    try {
+      const r = await get('/v1/web/search', { q, num: 10, category: 'general' });
+      $('#insWebSrc').textContent = 'source: ' + (r._source || '—') + (r.mock ? ' · MOCK' : '');
+      const hits = safeArr(r.hits);
+      if (!hits.length) {
+        Suite.renderEmpty($('#insWebOut'), '🌐', '无联网结果', r.warning || 'SearXNG 不可达或无结果。');
+        return;
+      }
+      const box = $('#insWebOut');
+      box.innerHTML = '';
+      hits.forEach(h => {
+        box.appendChild(el('div', { class: 'hit' },
+          el('div', { class: 'hd' }, '🌐', el('span', null, esc(h.engine || ''))),
+          el('div', { class: 'doc' }, el('a', { href: h.url || '#', target: '_blank', rel: 'noopener' }, esc(h.title || h.url || '—'))),
+          el('div', { class: 'snip' }, esc(h.snippet || '')),
+          el('div', { class: 'src' }, esc((h.url || '').slice(0, 90)))));
+      });
+    } catch (e) {
+      $('#insWebSrc').textContent = '不可用';
+      Suite.renderEmpty($('#insWebOut'), '⚠️', '联网检索失败', e.message);
+    }
+  }
+  return { run, webOnly };
+})();
+
+/* ============================================================
+   Models · 模型设置 (llm/vlm/embedding/ocr/asr/deterministic + gateway)
+   ============================================================ */
+const Models = (() => {
+  const { $, get, post, postForm, el, esc, toast, jsonPre } = Suite;
+  let cfgDraft = null;
+
+  const ROLE_ICON = { llm: '🧠', vlm: '👁', embedding: '📐', ocr: '🔤', asr: '🎙', deterministic: '🧱' };
+
+  async function refresh() {
+    try {
+      const r = await get('/v1/models/config');
+      cfgDraft = JSON.parse(JSON.stringify(r.config || {}));
+      Suite.store.modelsProbe = r.probe || {};
+      const models = cfgDraft.models || {};
+      const keys = Object.keys(models);
+      Suite.store.counters.modelsOnline = keys.filter(k => (r.probe || {})[k]?.online).length;
+      Suite.store.counters.modelsTotal = keys.length;
+      Suite.refreshCounters();
+      render();
+    } catch (e) {
+      toast('模型配置加载失败: ' + e.message, 'err');
+      $('#modelsWrap').innerHTML = '<div class="empty"><div class="ico">⚙️</div><div class="ttl">配置不可用</div><div class="desc">' + esc(e.message) + '</div></div>';
+    }
+  }
+
+  function render() {
+    const wrap = $('#modelsWrap');
+    wrap.innerHTML = '';
+    const models = cfgDraft.models || {};
+    const probe = Suite.store.modelsProbe || {};
+    Object.entries(models).forEach(([key, m]) => {
+      const locked = key === 'deterministic' || m.locked;
+      const p = probe[key] || {};
+      const card = el('div', { class: 'model-card' + (locked ? ' locked' : ''), id: 'mc-' + key });
+      card.appendChild(el('div', { class: 'mc-hd' },
+        el('div', { class: 'mc-role' }, ROLE_ICON[key] || '⚙️'),
+        el('div', null,
+          el('div', { class: 'mc-ttl' }, esc(m.label || key)),
+          el('div', { class: 'mc-desc' }, esc(m.note || m.role || ''))),
+        el('div', { style: 'margin-left:auto;display:flex;gap:8px;align-items:center' },
+          locked ? el('span', { class: 'tag warn' }, '🔒 铁律① 锁定') : null,
+          el('span', { class: 'tag ' + (m.enabled === false ? '' : p.online ? 'ok' : 'err'), id: 'mcPill-' + key },
+            m.enabled === false ? '已禁用' : p.online ? `● 在线 ${p.latency_ms ?? ''}ms` : '● 离线'))));
+      const bd = el('div', { class: 'mc-bd' });
+      bd.appendChild(el('div', { class: 'form-grid' },
+        field('endpoint', 'Endpoint', m.endpoint || '', `probe: ${m.probe_path || '/'}`, key, !locked, m.probe_path ? `GET ${m.probe_path}` : ''),
+        field('model', 'Model ID', m.model || '', '', key, !locked),
+        m.role ? el('div', { class: 'form-group' }, el('label', null, 'Role'), el('input', { value: m.role, disabled: true })) : null,
+        locked ? el('div', { class: 'form-group' }, el('label', null, 'enabled'), el('input', { value: '锁定启用 (不可禁用)', disabled: true })) : null));
+      card.appendChild(bd);
+      const foot = el('div', { class: 'mc-foot' });
+      foot.appendChild(label_sw('启用', m.enabled !== false, !locked, v => { m.enabled = v; }));
+      foot.appendChild(el('button', { class: 'btn sm', onclick: () => probeOne(key) }, '🔍 测试连接'));
+      foot.appendChild(el('span', { class: 'lat', id: 'mcLat-' + key },
+        p.error ? esc(String(p.error).slice(0, 80)) : p.status_code ? 'HTTP ' + p.status_code : ''));
+      if (m.ab_test || m.fallback) {
+        foot.appendChild(el('span', { class: 'tag violet', style: 'margin-left:9px' },
+          (m.ab_test ? `A/B:${m.ab_test.strategy || 'primary_only'}` : '') + (m.fallback ? ' · fallback' : '')));
+      }
+      card.appendChild(foot);
+      wrap.appendChild(card);
+    });
+    // gateway
+    const gw = cfgDraft.funasr_gateway || {};
+    const gp = probe.funasr_gateway || {};
+    $('#modelsGateway').innerHTML = '';
+    $('#modelsGateway').appendChild(el('div', { class: 'kv-grid' },
+      kv('endpoint', gw.endpoint || '—'),
+      kv('probe_path', gw.probe_path || '/health'),
+      kv('状态', gp.online ? `在线 ${gp.latency_ms ?? ''}ms` : gp.error ? String(gp.error).slice(0, 60) : '未探测'),
+      kv('config 版本', cfgDraft.version + ' · ' + (cfgDraft.updated_at || ''))));
+  }
+  function field(name, label, value, hint, key, editable, extraHint) {
+    return el('div', { class: 'form-group' },
+      el('label', null, label),
+      el('input', { value: value, disabled: !editable,
+        oninput: e => { cfgDraft.models[key][name] = e.target.value.trim(); } }),
+      hint ? el('div', { class: 'hint' }, hint) : (extraHint ? el('div', { class: 'hint' }, extraHint) : null));
+  }
+  function kv(k, v) { return el('div', { class: 'kv' }, el('span', { class: 'k' }, k), el('span', { class: 'v' }, String(v))); }
+  function label_sw(label, checked, editable, onChange) {
+    const inp = el('input', { type: 'checkbox', checked: checked, disabled: !editable, onchange: e => onChange(e.target.checked) });
+    return el('label', { class: 'switch' + (editable ? '' : ' disabled') }, inp, label);
+  }
+
+  async function probeOne(key) {
+    $('#mcLat-' + key).textContent = '探测中…';
+    $('#mcPill-' + key).className = 'tag warn';
+    $('#mcPill-' + key).textContent = '● 探测中';
+    const t0 = Date.now();
+    try {
+      const fd = new FormData();
+      fd.append('key', key);
+      const r = await postForm('/v1/models/probe', fd);
+      const p = r[key] || {};
+      const dt = Date.now() - t0;
+      const ok = !!p.online;
+      $('#mcPill-' + key).className = 'tag ' + (ok ? 'ok' : 'err');
+      $('#mcPill-' + key).textContent = ok ? `● 在线 ${p.latency_ms ?? dt}ms` : '● 离线';
+      $('#mcLat-' + key).textContent = ok ? `HTTP ${p.status_code} · ${dt}ms` : (p.error || p.skipped || 'probe failed');
+      Suite.store.modelsProbe[key] = { ...(Suite.store.modelsProbe[key] || {}), ...p };
+      toast(`${key} ${ok ? '在线' : '离线'}`, ok ? 'ok' : 'err');
+    } catch (e) {
+      $('#mcPill-' + key).className = 'tag err';
+      $('#mcPill-' + key).textContent = '● 离线';
+      $('#mcLat-' + key).textContent = e.message;
+      toast(`探测失败: ${e.message}`, 'err');
+    }
+    Suite.pollStatus();
+  }
+
+  async function probeAll() {
+    toast('批量探测全部模型端点…', 'ok', 2000);
+    try {
+      const r = await get('/v1/models/config');
+      Suite.store.modelsProbe = r.probe || {};
+      render();
+      const keys = Object.keys(cfgDraft.models || {});
+      keys.forEach(k => probeOne(k));
+    } catch (e) { toast('探测失败: ' + e.message, 'err'); }
+  }
+
+  async function save() {
+    if (!cfgDraft) return toast('配置未加载', 'warn');
+    // deterministic 铁律: 前端也强制 locked + enabled
+    const det = (cfgDraft.models || {}).deterministic;
+    if (det) { det.locked = true; det.enabled = true; }
+    for (const [k, m] of Object.entries(cfgDraft.models || {})) {
+      if (m.enabled === undefined) m.enabled = true;
+    }
+    try {
+      await post('/v1/models/config', cfgDraft);
+      toast('配置已保存 · deterministic 锁定已强制', 'ok');
+      refresh();
+    } catch (e) {
+      toast('保存失败: ' + e.message + ' · (校验失败时服务端拒绝, 保留上一份有效配置)', 'err');
+    }
+  }
+
+  return { refresh, load: refresh, save, probeOne, probeAll };
+})();
+
+/* ============================================================
+   RagLib · 多模态 RAG 库 (入库 · 清单 · 删除 · 试检索)
+   ============================================================ */
+const RagLib = (() => {
+  const { $, get, upload, del, el, fmtTime, safeArr, renderEmpty, renderSkelList, renderPager, esc, toast } = Suite;
+  let docs = [], filtered = [], page = 1, pageSize = 20, q = '', cust = '', sel = new Set();
+
+  async function refresh() {
+    renderSkelList($('#ragTbody'), 5);
+    try {
+      const r = await get('/v1/rag/docs', { customer_id: cust });
+      docs = safeArr(r.docs).map(d => ({ ...d }));
+      $('#ragTotal').textContent = `${r.count ?? docs.length} 篇`;
+      Suite.store.counters.ragTotal = r.count ?? docs.length;
+      Suite.refreshCounters();
+      // 客户筛选选项
+      const custs = [...new Set(docs.map(d => d.customer_id).filter(Boolean))];
+      [$('#ragCustFilter'), $('#ragSearchCust')].forEach(s => {
+        const cur = s.value;
+        s.innerHTML = '<option value="">所有客户</option>' + custs.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+        s.value = custs.includes(cur) ? cur : '';
+      });
+    } catch (e) {
+      docs = [];
+      const tb = $('#ragTbody');
+      tb.innerHTML = '';
+      tb.appendChild(el('tr', null, el('td', { colspan: '6', style: 'padding:0' },
+        (box => { renderEmpty(box, '📚', 'RAG 库不可用', e.message + ' · settings.rag_layers.enabled=false 或向量存储未初始化。'); return box; })(el('div')))));
+      Suite.store.counters.ragTotal = 0;
+      Suite.refreshCounters();
+      return;
+    }
+    applyFilter();
+  }
+
+  function applyFilter() {
+    q = $('#ragQ').value.trim().toLowerCase();
+    filtered = docs.filter(d => !q || ((d.id || '') + ' ' + (d.customer_id || '')).toLowerCase().includes(q));
+    page = 1;
+    render();
+  }
+
+  function render() {
+    const tb = $('#ragTbody');
+    tb.innerHTML = '';
+    if (!filtered.length) {
+      tb.appendChild(el('tr', null, el('td', { colspan: '6', style: 'padding:0' },
+        (box => { renderEmpty(box, docs.length ? '🔍' : '📚',
+          docs.length ? '没有匹配的文档' : '库为空',
+          docs.length ? '换个关键词试试。' : '在右侧拖入文件入库: 支持多模态与 zip 递归 (zip-slip 条目显式拒绝)。');
+          return box; })(el('div')))));
+      renderPager($('#ragPager'), 0, 1, pageSize, () => {});
+      return;
+    }
+    const start = (page - 1) * pageSize;
+    filtered.slice(start, start + pageSize).forEach(d => {
+      const isSel = sel.has(d.id);
+      tb.appendChild(el('tr', null,
+        el('td', { onclick: () => toggle(d.id) }, el('input', { type: 'checkbox', class: 'checkbox', checked: isSel })),
+        el('td', { class: 'mono', title: d.id }, esc(d.id).length > 44 ? '…' + esc(d.id).slice(-42) : esc(d.id)),
+        el('td', null, d.customer_id ? el('span', { class: 'tag' }, esc(d.customer_id)) : '—'),
+        el('td', null, safeArr(d.tags).map(t => el('span', { class: 'tag cyan', style: 'margin-right:4px' }, esc(t)))),
+        el('td', { class: 'num' }, d.chars ?? '—'),
+        el('td', { class: 'mono faint' }, fmtTime(d.indexed_at))));
+    });
+    renderPager($('#ragPager'), filtered.length, page, pageSize, p => { page = p; render(); });
+  }
+
+  function toggle(id) { sel.has(id) ? sel.delete(id) : sel.add(id); updateBatch(); render(); }
+  function clearSel() { sel.clear(); updateBatch(); render(); }
+  function updateBatch() {
+    $('#ragBatch').classList.toggle('show', sel.size > 0);
+    $('#ragBatchN').textContent = sel.size;
+  }
+
+  async function batchDelete() {
+    if (!sel.size) return toast('未选择文档', 'warn');
+    if (!confirm(`确定删除 ${sel.size} 篇已入库文档? 删除后需重新入库。`)) return;
+    let ok = 0;
+    for (const id of sel) {
+      try { await del('/v1/rag/docs/' + encodeURIComponent(id)); ok++; } catch { /* skip */ }
+    }
+    toast(`已删除 ${ok}/${sel.size} 篇`, ok ? 'ok' : 'err');
+    sel.clear(); updateBatch(); refresh();
+  }
+
+  /* ── 入库 ── */
+  function bindDrop() {
+    const dz = $('#ragDrop'), fi = $('#ragFile');
+    dz.addEventListener('click', () => fi.click());
+    ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('over'); }));
+    dz.addEventListener('drop', e => { ingestFiles(Array.from(e.dataTransfer.files)); });
+    fi.addEventListener('change', e => { ingestFiles(Array.from(e.target.files)); e.target.value = ''; });
+  }
+
+  async function ingestFiles(files) {
+    if (!files.length) return;
+    const custId = $('#ragCust').value.trim();
+    const tags = $('#ragTags').value.split(',').map(s => s.trim()).filter(Boolean);
+    const out = $('#ragIngestOut');
+    let okN = 0;
+    for (const f of files) {
+      const box = el('div', { class: 'hit mb8' },
+        el('div', { class: 'hd' }, '📥 ' + esc(f.name), el('span', { class: 'faint mono' }, Suite.fmtSize(f.size))),
+        el('div', { class: 'snip' }, '上传中…'));
+      out.prepend(box);
+      try {
+        const fd = new FormData();
+        fd.append('file', f);
+        if (custId) fd.append('customer_id', custId);
+        if (tags.length) fd.append('tags', tags.join(','));
+        const r = await upload('/v1/rag/ingest', fd);
+        if (r.ok) {
+          okN++;
+          box.querySelector('.snip').innerHTML =
+            `✅ 入库 ${r.n_docs} 篇 · embed: <span class="mono">${esc(r.embed_source || '—')}</span>` +
+            (safeArr(r.rejected).length ? `<br/><span class="warn-text">拒绝 ${r.rejected.length} 项: ${esc(JSON.stringify(r.rejected).slice(0, 200))}</span>` : '');
+        } else {
+          box.querySelector('.snip').innerHTML = `<span class="warn-text">⚠ 未入库: ${esc(r.reason || 'no-text')}</span>`;
+        }
+      } catch (e) {
+        box.querySelector('.snip').innerHTML = `<span class="err-text">✗ ${esc(e.message)}</span>`;
+      }
+    }
+    toast(`入库完成: ${okN}/${files.length}`, okN === files.length ? 'ok' : 'warn');
+    refresh();
+  }
+
+  async function testSearch() {
+    const q = $('#ragSearchQ').value.trim();
+    const out = $('#ragSearchOut');
+    if (!q) return toast('请输入查询内容', 'warn');
+    out.innerHTML = '<div class="loading-inline"><div class="spinner"></div>检索中…</div>';
+    try {
+      const r = await get('/v1/rag/search', { q, customer_id: $('#ragSearchCust').value || undefined, limit: 5 });
+      out.innerHTML = '';
+      const hits = safeArr(r.hits);
+      if (!hits.length) {
+        Suite.renderEmpty(out, '🕳', '未命中', '调整查询词或确认已入库文档内容。');
+        return;
+      }
+      hits.forEach(h => out.appendChild(el('div', { class: 'hit' },
+        el('div', { class: 'hd' }, '📄 ' + esc(h.id || h.doc_id || '—'),
+          h.score != null ? el('span', { class: 'score' }, 'sim ' + Number(h.score).toFixed(3)) : null),
+        el('div', { class: 'snip' }, esc((h.payload || {}).text || h.snippet || h.text || '').slice(0, 300)))));
+    } catch (e) {
+      out.innerHTML = '';
+      Suite.renderEmpty(out, '⚠️', '检索失败', e.message);
+    }
+  }
+
+  return { refresh, load: refresh, applyFilter, batchDelete, clearSel, toggle, bindDrop, testSearch };
+})();
+
+/* ============================================================
+   Ops · 本地状态 (内核 / 邮件链路 / 缓存 / 审计)
+   ============================================================ */
+const Ops = (() => {
+  const { $, get, el, esc, fmtTime, jsonPre, safeArr, toast } = Suite;
+  let autoTimer = null;
+
+  async function refresh() {
+    $('#opsTs').textContent = '刷新于 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    const [health, v12, audit, fly, cache, puller, cfg, nim] = await Promise.all([
+      get('/health').catch(() => ({ _err: 'unreachable' })),
+      get('/v1/v12/status').catch(() => ({})),
+      get('/v1/v12/audit', { limit: 20 }).catch(() => ({})),
+      get('/v1/flywheel/stats').catch(() => ({})),
+      get('/v1/cache/stats').catch(() => ({})),
+      get('/v1/mail/puller/status').catch(() => ({})),
+      get('/v1/config/status').catch(() => ({})),
+      get('/v1/nim/health').catch(() => ({}))
+    ]);
+
+    // KPI grid
+    const probe = Suite.store.modelsProbe || {};
+    const mOnline = Object.keys(probe).filter(k => probe[k]?.online).length;
+    const kpis = [
+      { lbl: '🧱 v12 内核', val: v12.kernel_online ? '在线' : '离线', sub: (v12.source_label || '').slice(0, 40), cls: v12.kernel_online ? 'ok' : 'warn' },
+      { lbl: '🩺 API', val: health._err ? '离线' : '在线', sub: health.version || '', cls: health._err ? 'err' : 'ok' },
+      { lbl: '⚙️ 模型', val: mOnline + '/' + Object.keys(probe).length, sub: 'probe 在线', cls: mOnline ? 'acc' : 'err' },
+      { lbl: '📈 内核报价', val: v12.calc_quote_total ?? 0, sub: `p50 ${v12.calc_quote_p50_ms ?? '—'}ms · p95 ${v12.calc_quote_p95_ms ?? '—'}ms`, cls: '' },
+      { lbl: '📮 邮件链路', val: puller.running ? '运行中' : '未运行', sub: puller.autostart_enabled ? 'autostart 开' : 'autostart 关', cls: puller.running ? 'ok' : 'warn' },
+      { lbl: '🏢 客户沙箱', val: fly.total_customers ?? 0, sub: `胜率 ${Math.round((fly.overall_win_rate ?? 0) * 100)}%`, cls: '' }
+    ];
+    const kg = $('#opsKpis');
+    kg.innerHTML = '';
+    kpis.forEach(k => kg.appendChild(el('div', { class: 'kpi ' + (k.cls || '') },
+      el('div', { class: 'lbl' }, k.lbl), el('div', { class: 'val' }, String(k.val)), el('div', { class: 'sub' }, k.sub || ' '))));
+
+    // V12
+    const v = $('#opsV12');
+    v.innerHTML = '';
+    v.appendChild(el('div', { class: 'kv-grid' },
+      kv('version', v12.version || '—'),
+      kv('kernel_online', String(v12.kernel_online)),
+      kv('calc_quote_total', v12.calc_quote_total ?? 0),
+      kv('dfm_conflicts', v12.dfm_conflicts_total ?? 0),
+      kv('spans / traces', `${v12.span_count ?? 0} / ${v12.trace_count ?? 0}`)));
+    // DFM buckets
+    const d = $('#opsDfm');
+    d.innerHTML = '';
+    const buckets = v12.dfm_c1_c6_counts || {};
+    const labels = { C1: '简单', C2: '标准', C3: '中等', C4: '复杂', C5: '高难', C6: '异常' };
+    d.appendChild(el('div', { class: 'grid', style: 'grid-template-columns:repeat(6,1fr)' },
+      Object.keys(labels).map(k => el('div', { class: 'kpi' },
+        el('div', { class: 'lbl' }, k + ' ' + labels[k]),
+        el('div', { class: 'val', style: 'font-size:20px' }, String(buckets[k] ?? 0))))));
+    // Mail
+    const m = $('#opsMail');
+    m.innerHTML = '';
+    const byState = puller.puller?.pending?.by_state || {};
+    m.appendChild(el('div', { class: 'kv-grid mb8' },
+      kv('running', String(!!puller.running)),
+      kv('enabled(gmail)', String(!!puller.puller?.enabled)),
+      kv('pending total', puller.puller?.pending?.total ?? 0)));
+    m.appendChild(el('div', { class: 'flex' }, Object.entries(byState).map(([s, n]) =>
+      el('span', { class: 'tag' + (s === 'HITL' ? ' warn' : s === 'BLOCKED' ? ' err' : s === 'DONE' ? ' ok' : '') }, s + ' ' + n))));
+    m.appendChild(el('div', { class: 'hint-inline mt8' },
+      puller.puller?.state?.last_error ? 'last_error: ' + esc(String(puller.puller.state.last_error).slice(0, 120)) : 'puller 正常 (或未启用 Gmail IMAP, 默认关闭)。'));
+    // Cache / NIM / config
+    const c = $('#opsCache');
+    c.innerHTML = '';
+    c.appendChild(el('div', { class: 'kv-grid mb8' },
+      kv('cache size', cache.size ?? 0),
+      kv('cache hits', cache.hits ?? 0),
+      kv('hit_rate', cache.hit_rate != null ? (cache.hit_rate * 100).toFixed(1) + '%' : '—'),
+      kv('NIM', nim.online ? `在线 ${nim.latency_ms ?? ''}ms` : (nim.mock ? 'mock 兜底' : '离线/未配'))));
+    const cfgLines = ['settings', 'skills'].map(k => {
+      const c0 = cfg[k] || {};
+      return `${k}: ${c0.loaded ? 'loaded' : 'empty'} · reload ${c0.reload_count ?? 0}` + (c0.last_error ? ' · err: ' + esc(String(c0.last_error).slice(0, 60)) : '');
+    });
+    c.appendChild(el('div', { class: 'hint-inline' }, cfgLines.map(l => '▸ ' + esc(l)).join('<br/>')));
+    // Audit
+    $('#opsAuditSub').textContent = `${audit.count ?? safeArr(audit.hashes).length} 条 · sha256 链`;
+    $('#opsAudit').textContent = JSON.stringify(audit, null, 2);
+  }
+  function kv(k, v) { return el('div', { class: 'kv' }, el('span', { class: 'k' }, k), el('span', { class: 'v' }, String(v))); }
+
+  function toggleAuto() {
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; toast('自动刷新已关', 'warn'); }
+    else { autoTimer = setInterval(refresh, 30000); toast('自动刷新 30s', 'ok'); refresh(); }
+  }
+  return { refresh, load: () => { refresh(); if (!autoTimer) autoTimer = setInterval(refresh, 30000); }, toggleAuto };
+})();
+
+/* ── Boot: bind dropzones after DOM ready (Drawings/RagLib modules) ── */
+document.addEventListener('DOMContentLoaded', () => {
+  try { Drawings.bindDrop(); } catch (e) {}
+  try { RagLib.bindDrop(); } catch (e) {}
+});
+</script>
+</body>
+</html>

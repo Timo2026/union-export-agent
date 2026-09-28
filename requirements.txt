@@ -1,0 +1,20 @@
+# Union Export Agent — trunk runtime deps
+# 核心黄金链只用 Python 3.11 标准库 (urllib/subprocess/json/sqlite3/hashlib) + PyYAML。
+# 制造内核的真实重依赖 (OCP/cadquery) 由引擎自带 .venv 提供, 见 docs/INTEGRATION.md。
+PyYAML>=6.0
+
+# 上传端口 / HTTP API 服务 (services/api_server.py)
+fastapi>=0.104
+uvicorn>=0.24
+python-multipart>=0.0.6
+
+# 可选: PDF/Excel 上传解析 (缺库则该模态显式标注 skipped, 不影响其它模态)
+pypdf>=3.0
+openpyxl>=3.1
+
+# 可选: 报价单 PDF 附件渲染 (services/quote_pdf.py; 缺库则草稿显式标注
+# attachment_error=reportlab_not_installed, 仍 draft_only, 不影响其它能力)
+reportlab>=4.0
+
+# 测试
+pytest>=7.0

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工业非标外贸工作台 · Union Export Agent</title>
+<link rel="stylesheet" href="/webui/console/css/app.css">
+</head>
+<body>
+<div id="shell">
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="brand-logo">UEA</div>
+      <div>
+        <div class="brand-name">外贸工作台</div>
+        <div class="brand-sub" id="release-marker">v7.1.0 · 六大工作台</div>
+      </div>
+    </div>
+    <nav id="nav">
+      <a href="#/mail" data-tab="mail"><span class="ico">✉</span>邮件台</a>
+      <a href="#/orders" data-tab="orders"><span class="ico">📦</span>订单台</a>
+      <a href="#/drawings" data-tab="drawings"><span class="ico">⚙</span>图纸台</a>
+      <a href="#/intel" data-tab="intel"><span class="ico">🔍</span>客户情报</a>
+      <a href="#/models" data-tab="models"><span class="ico">🧠</span>模型设置</a>
+      <a href="#/ops" data-tab="ops"><span class="ico">📡</span>本地状态</a>
+    </nav>
+    <div class="side-foot">
+      <div id="svc-line" class="svc-line">服务状态检测中…</div>
+      <div class="iron-rule">铁律: 服务不可达 → 显式 MOCK, 绝不冒充在线</div>
+    </div>
+  </aside>
+  <main id="main">
+    <header id="topbar">
+      <div id="crumb">工作台</div>
+      <div class="top-right">
+        <span id="mock-summary" class="mock-summary" title="本页 MOCK 来源计数"></span>
+        <button id="btn-top-health" class="btn ghost" title="刷新 /health">⟳ 健康检查</button>
+      </div>
+    </header>
+    <section id="view"><div class="loading">加载中…</div></section>
+  </main>
+</div>
+<div id="drawer-root"></div>
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+<script src="/webui/console/js/vendor/three.min.js"></script>
+<script type="module" src="/webui/console/js/app.js"></script>
+</body>
+</html>

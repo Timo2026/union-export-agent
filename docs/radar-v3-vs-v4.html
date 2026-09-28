@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>UEA v3.0.1 vs v4.0.0 技术雷达对比</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+  body { margin:0; background:#0d1117; color:#c9d1d9; font-family: 'Segoe UI', system-ui, sans-serif; }
+  .container { max-width:1200px; margin:0 auto; padding:24px; }
+  h1 { text-align:center; font-size:22px; margin-bottom:4px; color:#f0f6fc; }
+  .subtitle { text-align:center; font-size:13px; color:#8b949e; margin-bottom:20px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .card { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:16px; }
+  .card h3 { margin:0 0 10px 0; font-size:15px; color:#58a6ff; }
+  .card ul { margin:0; padding-left:18px; font-size:13px; line-height:1.7; color:#c9d1d9; }
+  .card ul li { margin-bottom:4px; }
+  .highlight { color:#f0883e; font-weight:600; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:12px; margin-left:6px; }
+  .badge-now { background:#238636; color:#fff; }
+  .badge-next { background:#8957e5; color:#fff; }
+  #radar { width:100%; height:520px; }
+  .footer { text-align:center; margin-top:16px; font-size:12px; color:#8b949e; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>UEA-NCPAAI 技术雷达对比</h1>
+  <div class="subtitle">
+    v3.0.1-mailbox（当前） vs v4.0.0-workbench（设计目标） · 2026-09-18
+  </div>
+
+  <div id="radar"></div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>v3.0.1-mailbox <span class="badge badge-now">当前</span></h3>
+      <ul>
+        <li><span class="highlight">8 Tab 按钮堆叠</span>：邮箱/上传/3D/反馈/技能/邮件台/V12/内核</li>
+        <li><span class="highlight">7 区只读卡片</span>：右栏 region 堆叠，无对话输入</li>
+        <li>10 个 Skill 已封装，但 <span class="highlight">无 Chat UI 调用 dispatcher</span></li>
+        <li>三栏 <span class="highlight">无交互联动</span>，右栏不能引用为左邮件批注</li>
+        <li>HITL 深埋 B-9，<span class="highlight">无全局 banner</span></li>
+        <li>LLM 离线时 <span class="highlight">静默降级</span>，用户无感知</li>
+        <li><span class="highlight">0 API 新增</span>，后端完全复用</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>v4.0.0-workbench <span class="badge badge-next">目标</span></h3>
+      <ul>
+        <li><span class="highlight">三栏 IA</span>：左 Inbox · 中 Inspector(5 tabs) · 右 Chat + Skill Console</li>
+        <li><span class="highlight">对话驱动</span>：自然语言 → Skill 编排 → Agent 气泡 + Badge + Cite + Trace</li>
+        <li>17 个 Agent Skills（9 复用 + 8 新增），全部 <span class="highlight">可 Chat 调用</span></li>
+        <li><span class="highlight">跨栏全联动</span>：点邮件→中栏加载+右栏 bind；Chat 调用→中栏高亮</li>
+        <li>铁律可视化：<span class="highlight">sha16 锁 + 篡改红 banner + 审计尾巴</span></li>
+        <li>离线降级显式：<span class="highlight">角标 🤖 rules_only / MOCK</span></li>
+        <li><span class="highlight">仅新增 5 API</span>：/chat/turn /history /reset /explain /skills</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer">
+    评分口径：1=缺失/薄弱，5=可用，10=优秀/领先 · 数据源自 PRD-v4-workbench.md §0 痛点核对 & §1-2 设计目标
+  </div>
+</div>
+
+<script>
+const chart = echarts.init(document.getElementById('radar'));
+const dimensions = [
+  '对话驱动',
+  '三栏协作',
+  'Skill 编排',
+  '跨栏联动',
+  '铁律可视化',
+  'HITL 体验',
+  '降级显式',
+  '后端零新增'
+];
+const dataV3 = [2, 3, 2, 1, 3, 2, 3, 10];
+const dataV4 = [9, 9, 9, 9, 9, 9, 9, 5];
+
+const option = {
+  backgroundColor: 'transparent',
+  tooltip: { trigger: 'item' },
+  legend: {
+    bottom: 0,
+    data: ['v3.0.1-mailbox（当前）', 'v4.0.0-workbench（目标）'],
+    textStyle: { color: '#c9d1d9', fontSize: 13 }
+  },
+  radar: {
+    indicator: dimensions.map(name => ({ name, max: 10 })),
+    center: ['50%', '48%'],
+    radius: '65%',
+    axisName: { color: '#8b949e', fontSize: 13, fontWeight: 500 },
+    splitArea: {
+      areaStyle: {
+        color: ['#161b22', '#0d1117', '#161b22', '#0d1117', '#161b22']
+      }
+    },
+    splitLine: { lineStyle: { color: '#30363d' } },
+    axisLine: { lineStyle: { color: '#30363d' } }
+  },
+  series: [{
+    type: 'radar',
+    data: [
+      {
+        value: dataV3,
+        name: 'v3.0.1-mailbox（当前）',
+        areaStyle: { color: 'rgba(48, 133, 214, 0.15)' },
+        lineStyle: { color: '#3085d6', width: 2 },
+        itemStyle: { color: '#3085d6' },
+        symbol: 'circle',
+        symbolSize: 6
+      },
+      {
+        value: dataV4,
+        name: 'v4.0.0-workbench（目标）',
+        areaStyle: { color: 'rgba(137, 87, 229, 0.15)' },
+        lineStyle: { color: '#8957e5', width: 2 },
+        itemStyle: { color: '#8957e5' },
+        symbol: 'circle',
+        symbolSize: 6
+      }
+    ]
+  }]
+};
+chart.setOption(option);
+window.addEventListener('resize', () => chart.resize());
+</script>
+</body>
+</html>

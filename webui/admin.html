@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Union Design Suite · 工业非标外贸工作台</title>
+<style>
+:root{
+  --bg:#0a0e1a;--bg2:#0e1322;--card:#131a2e;--card2:#1a2340;--line:#26304f;--line2:#34406b;
+  --tx:#e7ecff;--mut:#8b96b8;--dim:#5c6787;
+  --acc:#76B900;--acc-d:#5a8f00;--cy:#22d3ee;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--vio:#a78bfa;
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,#16203c 0%,var(--bg) 55%);color:var(--tx);
+     font:14px/1.55 "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;display:flex;overflow:hidden}
+::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:#2a3352;border-radius:5px}
+code,kbd{font-family:ui-monospace,Consolas,Menlo,monospace}
+a{color:var(--cy)}
+/* ---------- 侧边栏 ---------- */
+.side{width:224px;min-width:224px;background:var(--bg2);border-right:1px solid var(--line);display:flex;flex-direction:column}
+.side .logo{padding:18px 18px 14px;border-bottom:1px solid var(--line)}
+.side .logo b{font-size:15px;letter-spacing:.3px;display:flex;align-items:center;gap:8px}
+.side .logo .ver{font-size:11px;color:var(--mut);margin-top:3px}
+.nav{flex:1;overflow-y:auto;padding:10px 8px}
+.nav .grp{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:1.2px;padding:10px 10px 5px}
+.nav button{display:flex;align-items:center;gap:9px;width:100%;background:transparent;border:0;color:var(--mut);
+  padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;text-align:left;transition:.15s}
+.nav button:hover{background:var(--card);color:var(--tx)}
+.nav button.active{background:linear-gradient(90deg,rgba(118,185,0,.16),rgba(118,185,0,.05));color:var(--acc);font-weight:600}
+.nav button .cnt{margin-left:auto;font-size:10px;background:var(--card2);border:1px solid var(--line);
+  border-radius:8px;padding:0 6px;color:var(--mut)}
+.side .foot{padding:12px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--mut)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.dot.on{background:var(--ok);box-shadow:0 0 7px var(--ok)}.dot.off{background:var(--dim)}.dot.warn{background:var(--warn)}
+/* ---------- 主区 ---------- */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.top{height:54px;min-height:54px;border-bottom:1px solid var(--line);background:rgba(14,19,34,.85);backdrop-filter:blur(6px);
+  display:flex;align-items:center;gap:12px;padding:0 18px}
+.top h1{font-size:15px;margin:0;font-weight:700;white-space:nowrap}
+.top .sub{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{padding:3px 10px;border-radius:999px;font-size:11px;border:1px solid var(--line);background:var(--card);white-space:nowrap}
+.pill.on{color:var(--ok);border-color:#173a26}.pill.warn{color:var(--warn);border-color:#3a2a0f}.pill.err{color:var(--err);border-color:#3a1717}
+.pill.acc{color:var(--acc);border-color:#2c3d10}.pill.cy{color:var(--cy);border-color:#173a44}
+.spacer{flex:1}
+.page{flex:1;overflow-y:auto;padding:18px 20px}
+.view{display:none;animation:fade .18s ease}
+.view.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.vh{display:flex;align-items:baseline;gap:10px;margin:2px 0 14px;flex-wrap:wrap}
+.vh h2{margin:0;font-size:19px}
+.vh .desc{color:var(--mut);font-size:12px}
+/* ---------- 通用组件 ---------- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.btn{background:var(--card2);border:1px solid var(--line);color:var(--tx);padding:7px 14px;border-radius:8px;
+  cursor:pointer;font-size:12.5px;transition:.15s;white-space:nowrap}
+.btn:hover{border-color:var(--acc)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#08120a;font-weight:600}
+.btn.primary:hover{background:var(--acc-d)}
+.btn.danger{border-color:var(--err);color:var(--err);background:transparent}
+.btn.danger:hover{background:rgba(239,68,68,.12)}
+.btn.sm{padding:4px 10px;font-size:11.5px;border-radius:7px}
+.btn.ghost{background:transparent}
+.inp,select.inp,textarea.inp{background:var(--bg);border:1px solid var(--line);color:var(--tx);padding:8px 11px;
+  border-radius:8px;font-size:13px;font-family:inherit}
+.inp:focus{outline:none;border-color:var(--acc)}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.toolbar .grow{flex:1;min-width:160px}
+.chip{padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--mut);
+  font-size:12px;cursor:pointer;transition:.15s}
+.chip:hover{border-color:var(--acc)}
+.chip.on{background:rgba(118,185,0,.14);border-color:var(--acc);color:var(--acc);font-weight:600}
+table.tb{width:100%;border-collapse:collapse;font-size:12.5px}
+table.tb th{text-align:left;color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.6px;
+  padding:8px 10px;border-bottom:1px solid var(--line2);position:sticky;top:0;background:var(--card);z-index:1}
+table.tb td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.tb tr:hover td{background:rgba(118,185,0,.04)}
+table.tb tr.sel td{background:rgba(118,185,0,.08)}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;padding:1.5px 8px;border-radius:6px;
+  border:1px solid var(--line);color:var(--mut);white-space:nowrap}
+.tag.pass{color:var(--ok);border-color:#173a26;background:rgba(34,197,94,.08)}
+.tag.hitl,.tag.warn{color:var(--warn);border-color:#3a2a0f;background:rgba(245,158,11,.08)}
+.tag.blocked,.tag.err{color:var(--err);border-color:#3a1717;background:rgba(239,68,68,.08)}
+.tag.new,.tag.acc{color:var(--acc);border-color:#2c3d10;background:rgba(118,185,0,.08)}
+.tag.cy{color:var(--cy);border-color:#173a44;background:rgba(34,211,238,.07)}
+.tag.vio{color:var(--vio);border-color:#2e2450;background:rgba(167,139,250,.08)}
+.mut{color:var(--mut)}.dim{color:var(--dim)}.sm{font-size:11.5px}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:11.5px}
+/* 分页 */
+.pager{display:flex;align-items:center;gap:8px;padding:10px 4px 0;font-size:12px;color:var(--mut);flex-wrap:wrap}
+.pager button{background:var(--card2);border:1px solid var(--line);color:var(--tx);border-radius:7px;
+  padding:4px 11px;cursor:pointer;font-size:12px}
+.pager button:disabled{opacity:.4;cursor:not-allowed}
+.pager button.cur{background:var(--acc);border-color:var(--acc);color:#08120a;font-weight:700}
+/* 空状态 */
+.empty{text-align:center;padding:52px 20px;color:var(--mut);border:1px dashed var(--line2);border-radius:var(--r);background:rgba(19,26,46,.5)}
+.empty .ic{font-size:40px;opacity:.45;margin-bottom:8px}
+.empty b{color:var(--tx);font-size:14px}
+.empty .hint{font-size:12px;margin:6px 0 14px}
+/* 批量条 */
+.bulkbar{display:flex;align-items:center;gap:10px;background:linear-gradient(90deg,rgba(118,185,0,.14),rgba(34,211,238,.06));
+  border:1px solid var(--acc);border-radius:9px;padding:8px 14px;margin-bottom:10px;font-size:12.5px;animation:fade .15s}
+/* 抽屉 */
+.drawer-mask{position:fixed;inset:0;background:rgba(4,6,12,.55);opacity:0;pointer-events:none;transition:.2s;z-index:40}
+.drawer-mask.show{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:-560px;width:min(560px,94vw);height:100vh;background:var(--bg2);
+  border-left:1px solid var(--line2);z-index:41;transition:right .25s ease;display:flex;flex-direction:column}
+.drawer.show{right:0}
+.drawer .dh{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.drawer .dh b{font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drawer .db{flex:1;overflow-y:auto;padding:14px 18px}
+.region{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:10px 13px;margin-bottom:10px;font-size:12.5px}
+.region h4{margin:0 0 6px;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;display:flex;gap:6px;align-items:center}
+.region pre{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:9px;font-size:11.5px;
+  overflow:auto;max-height:220px;margin:6px 0 0;white-space:pre-wrap;color:#c7d2fe}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.kv .cell{background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px}
+.kv .cell b{display:block;color:var(--cy);font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+/* 骨架屏 */
+.sk{background:linear-gradient(90deg,var(--card) 25%,var(--card2) 50%,var(--card) 75%);background-size:200% 100%;
+  animation:sk 1.2s infinite;border-radius:8px}
+@keyframes sk{to{background-position:-200% 0}}
+/* 统计卡 */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 15px;position:relative;overflow:hidden}
+.stat::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--acc),var(--cy))}
+.stat .lb{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.7px}
+.stat .vl{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+.stat .ft{font-size:11px;color:var(--mut)}
+.stat.warn::before{background:var(--warn)}.stat.err::before{background:var(--err)}.stat.cy::before{background:var(--cy)}.stat.ok::before{background:var(--ok)}
+/* 拖拽区 */
+.dz{border:2px dashed var(--line2);border-radius:var(--r);padding:34px 18px;text-align:center;color:var(--mut);
+  background:var(--card);cursor:pointer;transition:.2s}
+.dz:hover,.dz.drag{border-color:var(--acc);background:rgba(118,185,0,.06);color:var(--tx)}
+.dz .ic{font-size:34px;opacity:.5}
+/* 模型卡 */
+.model-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.model-card .mh{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.model-card .mh b{font-size:14px}
+.model-card.locked{border-style:dashed}
+.model-card.primary-model{border-color:rgba(118,185,0,.45)}
+.model-card label{display:block;font-size:11px;color:var(--mut);margin:8px 0 3px}
+.model-card input{width:100%}
+.switch{position:relative;width:38px;height:20px;background:var(--card2);border:1px solid var(--line2);border-radius:999px;cursor:pointer;transition:.2s;flex-shrink:0}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--dim);transition:.2s}
+.switch.on{background:rgba(118,185,0,.25);border-color:var(--acc)}
+.switch.on::after{left:20px;background:var(--acc)}
+.switch.dis{opacity:.4;cursor:not-allowed}
+/* toast */
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--card2);
+  border:1px solid var(--acc);color:var(--tx);padding:10px 20px;border-radius:9px;opacity:0;transition:.25s;
+  pointer-events:none;z-index:99;font-size:13px;max-width:80vw}
+#toast.show{opacity:1;transform:translateX(-50%)}
+#toast.err{border-color:var(--err)}
+/* 布局辅助 */
+.cols{display:grid;gap:14px}
+.grid2{grid-template-columns:repeat(auto-fill,minmax(430px,1fr))}
+.mail-shell{display:grid;grid-template-columns:1fr 400px;gap:14px;align-items:start}
+@media (max-width:1180px){.mail-shell{grid-template-columns:1fr}.side{width:190px;min-width:190px}}
+.checkcol{width:30px}
+input[type=checkbox]{accent-color:var(--acc);width:15px;height:15px;cursor:pointer}
+.search-hit{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:11px 14px;margin-bottom:9px;transition:.15s}
+.search-hit:hover{border-color:var(--cy)}
+.search-hit .src{font-size:10px}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.gcard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;transition:.15s}
+.gcard:hover{border-color:var(--acc)}
+.gcard .pv{height:150px;background:#0a0e1c;display:flex;align-items:center;justify-content:center;overflow:hidden;border-bottom:1px solid var(--line)}
+.gcard .pv svg{max-width:100%;max-height:100%}
+.gcard .gi{padding:9px 12px;font-size:12px}
+.progress{height:5px;background:var(--card2);border-radius:3px;overflow:hidden}
+.progress>div{height:100%;background:linear-gradient(90deg,var(--acc),var(--cy));transition:width .5s}
+.logbox{background:#0a0e1c;border:1px solid var(--line);border-radius:8px;padding:10px;font-family:ui-monospace,Consolas,monospace;
+  font-size:11px;max-height:300px;overflow:auto;color:#a5b4d4}
+.logbox .t{color:var(--dim)}
+</style>
+</head>
+<body>
+<!-- ============ 侧边栏 ============ -->
+<aside class="side">
+  <div class="logo">
+    <b>⚙️ Union Design Suite</b>
+    <div class="ver">工业非标外贸工作台 · B 端后台</div>
+  </div>
+  <nav class="nav" id="nav">
+    <div class="grp">业务</div>
+    <button data-view="mail" class="active">📬 邮件中心 <span class="cnt" id="navMailCnt">—</span></button>
+    <button data-view="orders">📦 订单列表 <span class="cnt" id="navOrderCnt">—</span></button>
+    <button data-view="cad">📐 图纸预览 <span class="cnt" id="navCadCnt">—</span></button>
+    <div class="grp">智能</div>
+    <button data-view="rag">🔍 客户 RAG 搜索</button>
+    <button data-view="raglib">🗂 多模态 RAG 库</button>
+    <div class="grp">系统</div>
+    <button data-view="models">🧠 模型设置</button>
+    <button data-view="status">🖥 本地状态</button>
+  </nav>
+  <div class="foot">
+    <div><span class="dot" id="sideDot"></span><span id="sideStatus">连接中…</span></div>
+    <div class="dim" style="margin-top:4px">omni 推理 + Embed 检索内核</div>
+  </div>
+</aside>
+
+<!-- ============ 主区 ============ -->
+<div class="main">
+  <div class="top">
+    <h1 id="topTitle">邮件中心</h1>
+    <span class="sub" id="topSub">客户邮箱 · 黄金链 8 区聚合</span>
+    <span class="spacer"></span>
+    <span class="pill" id="pillApi">API ⏳</span>
+    <span class="pill" id="pillEngine">引擎 ⏳</span>
+    <span class="pill cy" id="pillVer">—</span>
+  </div>
+
+  <div class="page">
+
+  <!-- ==================== 邮件中心 ==================== -->
+  <section class="view active" id="view-mail">
+    <div class="vh"><h2>邮件中心</h2><span class="desc">客户收件箱 · 支持搜索 / 筛选 / 批量操作 / 分页</span></div>
+
+    <div class="toolbar">
+      <input class="inp grow" id="mailQ" placeholder="🔍 搜索客户名 / 发件人 / 主题…"/>
+      <div id="mailBadgeChips">
+        <button class="chip on" data-b="ALL">全部</button>
+        <button class="chip" data-b="NEW">🆕 NEW</button>
+        <button class="chip" data-b="PASS">✅ PASS</button>
+        <button class="chip" data-b="HITL">🟡 HITL</button>
+        <button class="chip" data-b="BLOCKED">⛔ BLOCKED</button>
+      </div>
+      <button class="chip" id="mailAttOnly">📎 仅含附件</button>
+      <select class="inp" id="mailPageSize" style="padding:6px 8px">
+        <option value="8">8 / 页</option><option value="15">15 / 页</option><option value="30">30 / 页</option>
+      </select>
+      <button class="btn sm" onclick="loadInbox(true)">↻ 刷新</button>
+    </div>
+
+    <div class="bulkbar hidden" id="mailBulk" style="display:none">
+      <b id="mailBulkCnt">已选 0 封</b>
+      <button class="btn sm" onclick="mailBatchVerify()">🛡 批量跑门禁</button>
+      <button class="btn sm" onclick="mailBatchDraft()">📝 批量起草回复</button>
+      <button class="btn sm" onclick="mailExportCsv()">⬇ 导出 CSV</button>
+      <button class="btn sm ghost" onclick="mailClearSel()">取消选择</button>
+    </div>
+
+    <div class="mail-shell">
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="max-height:640px;overflow-y:auto">
+        <table class="tb" id="mailTable">
+          <thead><tr>
+            <th class="checkcol"><input type="checkbox" id="mailSelAll"/></th>
+            <th>客户 / 发件人</th><th>主题</th><th>状态</th><th>驱动</th><th>时间</th>
+          </tr></thead>
+          <tbody id="mailTbody"></tbody>
+        </table>
+        </div>
+        <div id="mailEmpty" style="display:none">
+          <div class="empty" style="border:0">
+            <div class="ic">📭</div>
+            <b>收件箱为空</b>
+            <div class="hint">尚未拉取客户邮件, 可同步 Gmail 或装载演示场景体验黄金链</div>
+            <button class="btn sm primary" onclick="gmailSync()">📡 同步 Gmail</button>
+            <button class="btn sm" onclick="loadDemo('S1')">▶ 装载演示 S1</button>
+            <button class="btn sm" onclick="loadDemo('S3')">▶ 装载演示 S3 (HITL)</button>
+          </div>
+        </div>
+        <div class="pager" id="mailPager" style="padding:10px 14px"></div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <b style="font-size:13px">🔍 邮件详情 · 8 区聚合</b>
+            <span class="tag" id="mailDetailTag">未选择</span>
+          </div>
+          <div id="mailDetail"><div class="empty" style="padding:36px 14px">
+            <div class="ic">👈</div><b>选择一封邮件</b>
+            <div class="hint">点击左侧列表行, 查看客户 / 几何 / RAG / 门禁 / 报价等 8 区上下文</div>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 订单列表 ==================== -->
+  <section class="view" id="view-orders">
+    <div class="vh"><h2>订单列表</h2><span class="desc">客户沙箱 · 报价 / 成交飞轮统计</span></div>
+
+    <div class="stat-grid" id="orderStats">
+      <div class="stat"><div class="lb">总客户</div><div class="vl" id="osCust">—</div><div class="ft">客户沙箱数</div></div>
+      <div class="stat cy"><div class="lb">总报价</div><div class="vl" id="osQuotes">—</div><div class="ft">累计报价次数</div></div>
+      <div class="stat ok"><div class="lb">成交</div><div class="vl" id="osWon">—</div><div class="ft">won</div></div>
+      <div class="stat err"><div class="lb">丢单</div><div class="vl" id="osLost">—</div><div class="ft">lost</div></div>
+      <div class="stat warn"><div class="lb">总胜率</div><div class="vl" id="osRate">—</div><div class="ft">won / (won+lost)</div></div>
+    </div>
+
+    <div class="toolbar">
+      <input class="inp grow" id="ordQ" placeholder="🔍 搜索客户 ID / 名称…"/>
+      <button class="chip on" data-of="ALL">全部</button>
+      <button class="chip" data-of="WON">✅ 有成交</button>
+      <button class="chip" data-of="LOST">❌ 有丢单</button>
+      <button class="chip" data-of="COLD">💤 沉寂 (无报价)</button>
+      <select class="inp" id="ordSort" style="padding:6px 8px">
+        <option value="quotes">按报价数 ↓</option>
+        <option value="rate">按胜率 ↓</option>
+        <option value="name">按名称 A→Z</option>
+      </select>
+      <select class="inp" id="ordPageSize" style="padding:6px 8px">
+        <option value="8">8 / 页</option><option value="15">15 / 页</option>
+      </select>
+      <button class="btn sm" onclick="loadOrders(true)">↻ 刷新</button>
+    </div>
+
+    <div class="bulkbar" id="ordBulk" style="display:none">
+      <b id="ordBulkCnt">已选 0 个客户</b>
+      <button class="btn sm" onclick="ordExportCsv()">⬇ 导出 CSV</button>
+      <button class="btn sm" onclick="ordBatchOpen()">🔍 批量查看画像</button>
+      <button class="btn sm ghost" onclick="ordClearSel()">取消选择</button>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="max-height:560px;overflow-y:auto">
+      <table class="tb">
+        <thead><tr>
+          <th class="checkcol"><input type="checkbox" id="ordSelAll"/></th>
+          <th>客户</th><th>报价</th><th>成交 / 丢单</th><th>胜率</th><th>定价模型</th><th>操作</th>
+        </tr></thead>
+        <tbody id="ordTbody"></tbody>
+      </table>
+      </div>
+      <div id="ordEmpty" style="display:none">
+        <div class="empty" style="border:0">
+          <div class="ic">📦</div>
+          <b>暂无订单数据</b>
+          <div class="hint">客户沙箱尚未产生报价记录; 邮件黄金链跑通报价后会自动写入飞轮</div>
+          <button class="btn sm primary" onclick="switchView('mail')">→ 去邮件中心跑一封</button>
+        </div>
+      </div>
+      <div class="pager" id="ordPager" style="padding:10px 14px"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 图纸预览 ==================== -->
+  <section class="view" id="view-cad">
+    <div class="vh"><h2>STEP 图纸预览</h2><span class="desc">上传 .step/.stp → 真实几何解析 + SVG 缩略图 (确定性内核)</span></div>
+
+    <div class="cols" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+      <div class="dz" id="cadDz">
+        <div class="ic">📐</div>
+        <div><b>拖拽 STEP 文件到此处</b> 或点击选择</div>
+        <div class="sm mut" style="margin-top:4px">仅 .step / .stp · 几何摘要由 CNC-AI-Brain v12 确定性内核计算</div>
+        <input type="file" id="cadFile" accept=".step,.stp" style="display:none"/>
+      </div>
+      <div class="card" id="cadResult">
+        <div class="empty" style="border:0;padding:26px 10px">
+          <div class="ic">🧊</div><b>尚未解析图纸</b>
+          <div class="hint">上传后展示 bbox / 体积 / 质量 / 特征数 + SVG 投影缩略图</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <b style="font-size:13px">🗄 解析历史</b>
+      <input class="inp grow" id="cadQ" placeholder="🔍 搜索文件名 / SHA…"/>
+      <button class="btn sm danger" onclick="cadClearHistory()">🗑 清空历史</button>
+    </div>
+    <div class="gallery" id="cadGallery"></div>
+    <div id="cadEmpty" class="empty">
+      <div class="ic">🗄</div><b>暂无解析历史</b>
+      <div class="hint">解析过的图纸会缓存在本地 (含 sha256 去重), 可一键检索相似案例</div>
+    </div>
+  </section>
+
+  <!-- ==================== 客户 RAG 搜索 ==================== -->
+  <section class="view" id="view-rag">
+    <div class="vh"><h2>客户 RAG 搜索</h2><span class="desc">历史案例 / 邮件 / 图纸向量召回 + 联网信息补全</span></div>
+
+    <div class="card" style="margin-bottom:14px">
+      <div class="toolbar" style="margin-bottom:0">
+        <input class="inp grow" id="ragQ" placeholder="🔍 输入检索词, 如: 6061 法兰盘 阳极氧化 / 304 不锈钢薄壁件…"/>
+        <input class="inp" id="ragCust" placeholder="客户 ID (可选)" style="width:150px"/>
+        <select class="inp" id="ragLimit" style="padding:6px 8px"><option value="5">Top 5</option><option value="10">Top 10</option><option value="20">Top 20</option></select>
+        <button class="chip" id="ragWeb">🌐 联网补全</button>
+        <button class="btn primary" onclick="ragSearch()">检索</button>
+      </div>
+      <div class="sm mut" style="margin-top:8px" id="ragHint">Embedding 模型驱动向量召回; 开启「联网补全」后经 omni 模型整合公开信息 (路由预览经 /v1/agent/route)</div>
+    </div>
+
+    <div id="ragResults"></div>
+    <div id="ragEmpty" class="empty">
+      <div class="ic">🔍</div><b>输入关键词开始检索</b>
+      <div class="hint">召回范围: ingest 文档库 + 客户沙箱知识; 支持按客户 ID 过滤</div>
+    </div>
+  </section>
+
+  <!-- ==================== 多模态 RAG 库 ==================== -->
+  <section class="view" id="view-raglib">
+    <div class="vh"><h2>多模态 RAG 库管理</h2><span class="desc">文档入库 / 清单 / 删除 · 支持 step / pdf / 邮件 / 语音 / 图片 / Excel</span></div>
+
+    <div class="cols" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+      <div class="dz" id="ragDz">
+        <div class="ic">📥</div>
+        <div><b>拖拽文件入库</b> 或点击选择 (含 zip 嵌套 / GBK 文件名)</div>
+        <div class="sm mut" style="margin-top:4px">抽文本 → Embed 向量化 → ingest_docs 集合</div>
+        <input type="file" id="ragFile" multiple style="display:none"/>
+      </div>
+      <div class="card">
+        <b style="font-size:13px">入库参数</b>
+        <label class="sm mut" style="display:block;margin:10px 0 3px">客户 ID (可选, 用于按客户过滤)</label>
+        <input class="inp" id="ragInCust" placeholder="如 CUST-ACME" style="width:100%"/>
+        <label class="sm mut" style="display:block;margin:10px 0 3px">标签 (逗号分隔)</label>
+        <input class="inp" id="ragInTags" placeholder="如 报价基准, 6061" style="width:100%"/>
+        <div class="logbox" id="ragInLog" style="margin-top:10px;display:none"></div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <input class="inp grow" id="ragDocQ" placeholder="🔍 搜索文档名 / 标签…"/>
+      <input class="inp" id="ragDocCust" placeholder="客户 ID 过滤" style="width:150px"/>
+      <select class="inp" id="ragDocPageSize" style="padding:6px 8px"><option value="8">8 / 页</option><option value="15">15 / 页</option></select>
+      <button class="btn sm" onclick="loadRagDocs(true)">↻ 刷新</button>
+    </div>
+
+    <div class="bulkbar" id="ragBulk" style="display:none">
+      <b id="ragBulkCnt">已选 0 篇</b>
+      <button class="btn sm danger" onclick="ragBatchDelete()">🗑 批量删除</button>
+      <button class="btn sm ghost" onclick="ragClearSel()">取消选择</button>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="max-height:480px;overflow-y:auto">
+      <table class="tb">
+        <thead><tr>
+          <th class="checkcol"><input type="checkbox" id="ragSelAll"/></th>
+          <th>文档</th><th>模态</th><th>客户</th><th>标签</th><th>chunk</th><th>入库时间</th><th>操作</th>
+        </tr></thead>
+        <tbody id="ragDocTbody"></tbody>
+      </table>
+      </div>
+      <div id="ragDocEmpty" style="display:none">
+        <div class="empty" style="border:0">
+          <div class="ic">🗂</div><b>文档库为空</b>
+          <div class="hint">拖拽上方文件入库, 或检查 RAG gateway 是否启用 (settings.rag_layers.enabled)</div>
+        </div>
+      </div>
+      <div class="pager" id="ragDocPager" style="padding:10px 14px"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 模型设置 ==================== -->
+  <section class="view" id="view-models">
+    <div class="vh"><h2>模型设置</h2><span class="desc">omni 多模态推理 + Embedding 检索 · 端点注册表 / 在线探测</span></div>
+
+    <div class="toolbar">
+      <span class="pill acc">主推理栈: omni (VLM) + embedding</span>
+      <span class="spacer"></span>
+      <button class="btn sm" onclick="loadModels(true)">↻ 重新加载</button>
+      <button class="btn sm" onclick="probeAll()">📡 探测全部</button>
+      <button class="btn sm primary" onclick="saveModels()">💾 保存配置</button>
+    </div>
+
+    <div class="cols grid2" id="modelCards"></div>
+    <div id="modelEmpty" class="empty" style="display:none">
+      <div class="ic">🧠</div><b>模型注册表不可用</b>
+      <div class="hint">/v1/models/config 拉取失败, 请确认后端已启动</div>
+    </div>
+  </section>
+
+  <!-- ==================== 本地状态 ==================== -->
+  <section class="view" id="view-status">
+    <div class="vh"><h2>本地状态查询</h2><span class="desc">引擎 / 内核 / 路由 / 缓存 / 邮件拉取器 实时健康</span>
+      <span class="spacer"></span>
+      <button class="btn sm" onclick="loadStatus()">↻ 全部刷新</button>
+      <button class="chip" id="stAuto">⏱ 自动刷新 (10s)</button>
+    </div>
+
+    <div class="stat-grid" id="stTop">
+      <div class="stat ok"><div class="lb">API</div><div class="vl" id="stApi">—</div><div class="ft" id="stApiFt">/health</div></div>
+      <div class="stat"><div class="lb">引擎</div><div class="vl" id="stEngine" style="font-size:16px">—</div><div class="ft" id="stEngineFt">timo source</div></div>
+      <div class="stat cy"><div class="lb">多模态</div><div class="vl" id="stMM" style="font-size:16px">—</div><div class="ft" id="stMMFt">funasr source</div></div>
+      <div class="stat warn"><div class="lb">缓存命中率</div><div class="vl" id="stCache">—</div><div class="ft" id="stCacheFt">/v1/cache/stats</div></div>
+    </div>
+
+    <div class="cols grid2">
+      <div class="card"><b style="font-size:13px">🧬 v12 内核状态</b><span class="pill sm" id="stV12Pill" style="float:right">—</span>
+        <div class="kv" id="stV12" style="margin-top:10px"></div>
+        <div class="progress" style="margin-top:10px"><div id="stV12Bar"></div></div>
+        <div class="sm mut" style="margin-top:6px" id="stV12Ft">—</div>
+      </div>
+      <div class="card"><b style="font-size:13px">🕸 Model Mesh 路由</b>
+        <div id="stRouter" style="margin-top:10px"></div>
+      </div>
+      <div class="card"><b style="font-size:13px">📮 邮件拉取器 / Gmail</b>
+        <div class="kv" id="stMail" style="margin-top:10px"></div>
+      </div>
+      <div class="card"><b style="font-size:13px">🌐 NIM 云端健康</b>
+        <div id="stNim" style="margin-top:10px" class="sm"></div>
+      </div>
+      <div class="card" style="grid-column:1/-1"><b style="font-size:13px">🧾 v12 审计流水</b>
+        <div class="logbox" id="stAudit" style="margin-top:10px">—</div>
+      </div>
+    </div>
+  </section>
+
+  </div><!-- /page -->
+</div><!-- /main -->
+
+<!-- 抽屉 -->
+<div class="drawer-mask" id="drawerMask" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="dh"><b id="drawerTitle">详情</b><button class="btn sm ghost" onclick="closeDrawer()">✕ 关闭</button></div>
+  <div class="db" id="drawerBody"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* =================================================================
+ * Union Design Suite · design-suite-router (webui/admin.html)
+ * 全接线 FastAPI 后端; API 失败时优雅降级为空状态/错误提示
+ * ================================================================= */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmtT = ts => { if(!ts) return "—"; const d=new Date(ts*1000); return d.toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}); };
+const fmtSize = b => b==null?"—":(b<1024?b+" B":b<1048576?(b/1024).toFixed(1)+" KB":(b/1048576).toFixed(1)+" MB");
+let toastTimer=null;
+function toast(msg, err){ const t=$("#toast"); t.textContent=msg; t.className=err?"show err":"show";
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2600); }
+async function jget(url){ const r=await fetch(url); if(!r.ok) throw new Error(`${url} → ${r.status}`); return r.json(); }
+async function jpost(url, body, isForm){
+  const opt = {method:"POST"};
+  if(isForm){ opt.body = body; } else { opt.headers={"Content-Type":"application/json"}; opt.body=JSON.stringify(body||{}); }
+  const r=await fetch(url,opt);
+  if(!r.ok){ let d=""; try{d=(await r.json()).detail||""}catch(e){} throw new Error(`${url} → ${r.status} ${d}`); }
+  return r.json();
+}
+async function jdel(url){ const r=await fetch(url,{method:"DELETE"}); if(!r.ok) throw new Error(`${url} → ${r.status}`); return r.json(); }
+
+/* ---------- 视图路由 ---------- */
+const VIEW_META = {
+  mail:["邮件中心","客户邮箱 · 黄金链 8 区聚合"],
+  orders:["订单列表","客户沙箱 · 报价成交飞轮"],
+  cad:["STEP 图纸预览","几何解析 · SVG 缩略图"],
+  rag:["客户 RAG 搜索","向量召回 + 联网补全"],
+  raglib:["多模态 RAG 库","文档入库 / 清单 / 删除"],
+  models:["模型设置","omni 推理 + Embedding 检索"],
+  status:["本地状态","引擎 / 内核 / 路由健康"],
+};
+function switchView(v){
+  $$("#nav button").forEach(b=>b.classList.toggle("active", b.dataset.view===v));
+  $$(".view").forEach(s=>s.classList.toggle("active", s.id==="view-"+v));
+  const m=VIEW_META[v]||["",""]; $("#topTitle").textContent=m[0]; $("#topSub").textContent=m[1];
+  if(v==="mail") loadInbox();
+  if(v==="orders") loadOrders();
+  if(v==="raglib") loadRagDocs();
+  if(v==="models") loadModels();
+  if(v==="status") loadStatus();
+  if(v==="cad") renderCadGallery();
+}
+$("#nav").addEventListener("click", e=>{ const b=e.target.closest("button[data-view]"); if(b) switchView(b.dataset.view); });
+
+/* ---------- 通用分页器 ---------- */
+function renderPager(el, total, page, size, onGo){
+  const pages = Math.max(1, Math.ceil(total/size));
+  if(total===0){ el.innerHTML=""; return; }
+  let nums="";
+  const lo=Math.max(1,page-2), hi=Math.min(pages,page+2);
+  for(let p=lo;p<=hi;p++) nums+=`<button class="${p===page?'cur':''}" data-p="${p}">${p}</button>`;
+  el.innerHTML=`<span>共 ${total} 条 · ${page}/${pages} 页</span><span class="spacer"></span>
+    <button data-p="${page-1}" ${page<=1?"disabled":""}>‹ 上一页</button>${nums}
+    <button data-p="${page+1}" ${page>=pages?"disabled":""}>下一页 ›</button>`;
+  el.querySelectorAll("button[data-p]").forEach(b=>b.onclick=()=>onGo(+b.dataset.p));
+}
+const paginate = (arr,page,size)=>arr.slice((page-1)*size, page*size);
+
+/* ---------- 空状态/骨架 ---------- */
+const skRow = n=>Array.from({length:n},()=>'<div class="sk" style="height:34px;margin:6px 10px"></div>').join("");
+
+/* =================================================================
+ * 模块 1 · 邮件中心
+ * ================================================================= */
+const mailState = {items:[], q:"", badge:"ALL", attOnly:false, page:1, size:8, sel:new Set(), openId:null};
+
+async function loadInbox(force){
+  const tb=$("#mailTbody");
+  if(force||!mailState.items.length) tb.innerHTML=`<tr><td colspan="6">${skRow(6)}</td></tr>`;
+  try{
+    const d = await jget("/v1/mail/inbox?limit=200");
+    mailState.items = d.items||[];
+    $("#navMailCnt").textContent = mailState.items.length;
+  }catch(e){ mailState.items=[]; tb.innerHTML=`<tr><td colspan="6"><div class="empty" style="border:0"><div class="ic">⚠️</div><b>收件箱拉取失败</b><div class="hint">${esc(e.message)}</div></div></td></tr>`; return; }
+  mailState.page = Math.min(mailState.page, Math.max(1,Math.ceil(mailFiltered().length/mailState.size))||1);
+  renderMail();
+}
+function mailFiltered(){
+  const q=mailState.q.toLowerCase();
+  return mailState.items.filter(it=>{
+    if(mailState.badge!=="ALL" && !(it.badges||[]).includes(mailState.badge)) return false;
+    if(mailState.attOnly && !(it.attachments_count>0)) return false;
+    if(q && !((it.from||"").toLowerCase().includes(q)||(it.subject||"").toLowerCase().includes(q)||(it.mail_id||"").toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+function badgeTag(b){
+  const m={PASS:"pass",HITL:"hitl",BLOCKED:"blocked",NEW:"new"};
+  return `<span class="tag ${m[b]||''}">${esc(b)}</span>`;
+}
+function renderMail(){
+  const list=mailFiltered(), tb=$("#mailTbody");
+  $("#mailEmpty").style.display = mailState.items.length? "none":"block";
+  $("#mailTable").style.display = list.length? "":"none";
+  if(!list.length && mailState.items.length){
+    tb.innerHTML=`<tr><td colspan="6"><div class="empty" style="border:0"><div class="ic">🔍</div><b>无匹配结果</b><div class="hint">调整搜索词或筛选条件</div></div></td></tr>`;
+    $("#mailPager").innerHTML=""; return;
+  }
+  const rows=paginate(list,mailState.page,mailState.size);
+  tb.innerHTML=rows.map(it=>{
+    const pend=it.pending||{};
+    const st=(it.badges||[]).map(badgeTag).join("");
+    const drv=pend.state?`<span class="tag ${pend.state==='DONE'?'pass':pend.state==='HITL'?'hitl':pend.state==='NEW'?'new':''}">${esc(pend.state)}</span>`:'<span class="dim sm">—</span>';
+    const from=(it.from||"").split("<")[0].trim()||it.from||"—";
+    return `<tr class="${mailState.openId===it.mail_id?'sel':''}" data-mid="${esc(it.mail_id)}">
+      <td class="checkcol" onclick="event.stopPropagation()"><input type="checkbox" data-mid="${esc(it.mail_id)}" ${mailState.sel.has(it.mail_id)?"checked":""}/></td>
+      <td><div style="font-weight:600">${esc(from)}</div><div class="dim sm mono">${esc(it.mail_id.slice(0,20))}</div></td>
+      <td><div style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.subject||"(无主题)")}</div>
+          ${it.attachments_count?`<span class="tag cy">📎 ${it.attachments_count}</span>`:""}</td>
+      <td>${st||'<span class="dim sm">—</span>'}</td><td>${drv}</td>
+      <td class="mut sm">${fmtT(it.received_at)}</td></tr>`;
+  }).join("");
+  tb.querySelectorAll("tr[data-mid]").forEach(tr=>{
+    tr.addEventListener("click", ()=>openMail(tr.dataset.mid));
+    const cb=tr.querySelector("input[type=checkbox]");
+    cb.onchange=()=>{ cb.checked?mailState.sel.add(tr.dataset.mid):mailState.sel.delete(tr.dataset.mid); syncMailBulk(); };
+  });
+  $("#mailSelAll").checked = rows.length>0 && rows.every(it=>mailState.sel.has(it.mail_id));
+  renderPager($("#mailPager"), list.length, mailState.page, mailState.size, p=>{mailState.page=p;renderMail();});
+  syncMailBulk();
+}
+function syncMailBulk(){
+  const n=mailState.sel.size;
+  $("#mailBulk").style.display=n?"flex":"none";
+  $("#mailBulkCnt").textContent=`已选 ${n} 封`;
+}
+function mailClearSel(){ mailState.sel.clear(); renderMail(); }
+$("#mailQ").addEventListener("input", e=>{mailState.q=e.target.value;mailState.page=1;renderMail();});
+$("#mailBadgeChips").addEventListener("click", e=>{ const c=e.target.closest(".chip"); if(!c)return;
+  $$("#mailBadgeChips .chip").forEach(x=>x.classList.remove("on")); c.classList.add("on");
+  mailState.badge=c.dataset.b; mailState.page=1; renderMail(); });
+$("#mailAttOnly").addEventListener("click", e=>{ mailState.attOnly=!mailState.attOnly; e.target.classList.toggle("on",mailState.attOnly); mailState.page=1; renderMail(); });
+$("#mailPageSize").addEventListener("change", e=>{mailState.size=+e.target.value;mailState.page=1;renderMail();});
+$("#mailSelAll").addEventListener("change", e=>{
+  paginate(mailFiltered(),mailState.page,mailState.size).forEach(it=>e.target.checked?mailState.sel.add(it.mail_id):mailState.sel.delete(it.mail_id));
+  renderMail();
+});
+function mailExportCsv(){
+  const rows=mailFiltered().filter(it=>mailState.sel.has(it.mail_id));
+  const csv="mail_id,from,subject,badges,state,received_at\n"+rows.map(it=>
+    [it.mail_id,`"${(it.from||"").replace(/"/g,'""')}"`,`"${(it.subject||"").replace(/"/g,'""')}"`,(it.badges||[]).join("|"),(it.pending||{}).state||"",fmtT(it.received_at)].join(",")).join("\n");
+  dlBlob(csv, `mail-export-${Date.now()}.csv`, "text/csv");
+  toast(`已导出 ${rows.length} 封邮件`);
+}
+async function mailBatchVerify(){
+  const ids=[...mailState.sel]; if(!ids.length) return;
+  toast(`🛡 批量门禁 ${ids.length} 封, 执行中…`);
+  let ok=0;
+  for(const mid of ids){
+    try{ await jpost("/v1/agent/task",{intent:"verify_gate",driver:"console",args:{mail_id:mid}}); ok++; }catch(e){}
+  }
+  toast(`门禁完成 ${ok}/${ids.length}`); mailClearSel(); loadInbox(true);
+}
+async function mailBatchDraft(){
+  const ids=[...mailState.sel]; if(!ids.length) return;
+  toast(`📝 批量起草 ${ids.length} 封 (draft_only 铁律③)…`);
+  let ok=0;
+  for(const mid of ids){
+    try{ await jpost("/v1/agent/task",{intent:"write_reply",driver:"console",args:{mail_id:mid}}); ok++; }catch(e){}
+  }
+  toast(`起草完成 ${ok}/${ids.length}`); mailClearSel();
+}
+async function loadDemo(sid){
+  toast(`▶ 装载演示场景 ${sid}…`);
+  try{ const d=await jpost(`/v1/demo/scenario/${sid}`); toast(`${sid}: ${d.state||"done"}`); loadInbox(true);
+    if(d.mail_id) setTimeout(()=>openMail(d.mail_id),400);
+  }catch(e){ toast("演示装载失败: "+e.message, true); }
+}
+async function gmailSync(){
+  try{ const d=await jpost("/v1/gmail/sync"); toast(`Gmail 同步: ${d.synced??"ok"}`); loadInbox(true); }
+  catch(e){ toast("Gmail 同步失败: "+e.message,true); }
+}
+async function openMail(mid){
+  mailState.openId=mid; renderMail();
+  $("#mailDetailTag").textContent=mid.slice(0,16);
+  $("#mailDetail").innerHTML=skRow(6);
+  const ctx=async p=>jget(`/v1/mail/${encodeURIComponent(mid)}/context/${p}`).catch(e=>({_err:e.message}));
+  const [mail,cust,geo,rag,pend,verif,comm,hitl]=await Promise.all([
+    jget(`/v1/mail/${encodeURIComponent(mid)}`).catch(e=>({_err:e.message})),
+    ctx("customer"),ctx("geometry"),ctx("rag"),ctx("pending"),ctx("verification"),ctx("commercial"),ctx("hitl")]);
+  const v=verif||{}, vCls=v.status==="PASS"?"pass":v.status==="HITL"?"hitl":v.status==="BLOCKED"?"blocked":"";
+  const hits=(rag&&rag.hits)||[];
+  $("#mailDetail").innerHTML=`
+    <div class="region"><h4>🛡 门禁 <span class="tag ${vCls}">${esc(v.status||"?")}</span></h4>
+      <div class="sm">风险分 <b>${v.risk_score??"—"}</b> · ${(v.reasons||[]).map(esc).join("; ")||"无升级原因"}</div></div>
+    <div class="region"><h4>👤 客户 ${cust&&cust.is_new?'<span class="tag new">新客</span>':'<span class="tag">老客</span>'}</h4>
+      <div>${esc(cust?.name||"—")} <span class="dim mono sm">${esc(cust?.customer_id||"")}</span></div>
+      ${(cust?.signals||[]).map(s=>`<div class="sm mut">· ${esc(s.type)}: ${esc(s.detail)}</div>`).join("")}</div>
+    <div class="region"><h4>📐 几何</h4>
+      <div class="sm">bbox ${geo?.bbox?geo.bbox.join("×")+" mm":"—"} · 体积 ${geo?.volume_cm3??"—"} cm³ · 质量 ${geo?.weight_kg??"—"} kg</div></div>
+    <div class="region"><h4>💰 报价</h4>
+      <div class="sm">${comm?.ok?`${esc(comm.currency||"CNY")} ${comm.unit_price} × qty = <b>${esc(comm.final_price||comm.total_price||"")}</b>`:"未报价"}</div></div>
+    <div class="region"><h4>🔍 RAG (${hits.length})</h4>
+      ${hits.slice(0,3).map(h=>`<div class="sm mut">· <code>${esc(h.case_id||"")}</code> ${esc(h.title||h.snippet||"")}</div>`).join("")||'<div class="sm dim">无召回</div>'}</div>
+    ${hitl&&hitl.draft?`<div class="region"><h4>📝 HITL 草稿</h4><pre>${esc(hitl.draft.body||"")}</pre>
+      <div style="margin-top:8px;display:flex;gap:8px"><button class="btn sm primary" onclick="approveHitl('${esc(mid)}')">✔ 批准发送</button>
+      <button class="btn sm danger" onclick="toast('已拒绝 (HITL 铁律② 保留草稿)')">✖ 拒绝</button></div></div>`:""}
+    ${mail&&mail.body?`<div class="region"><h4>📄 正文</h4><pre>${esc(String(mail.body).slice(0,1500))}</pre></div>`:""}
+    ${pend&&!pend._err?`<div class="region"><h4>⚙️ 处理流水</h4><pre>${esc(JSON.stringify(pend,null,1).slice(0,600))}</pre></div>`:""}
+  `;
+}
+async function approveHitl(mid){
+  try{ await jpost("/v1/agent/task",{intent:"approve_gate",driver:"console",args:{mail_id:mid,approver:"console"}}); toast("✔ 已批准"); openMail(mid); }
+  catch(e){ toast("批准失败: "+e.message,true); }
+}
+
+/* =================================================================
+ * 模块 2 · 订单列表
+ * ================================================================= */
+const ordState={customers:[],q:"",filter:"ALL",sort:"quotes",page:1,size:8,sel:new Set()};
+async function loadOrders(force){
+  const tb=$("#ordTbody");
+  if(force||!ordState.customers.length) tb.innerHTML=`<tr><td colspan="7">${skRow(5)}</td></tr>`;
+  try{
+    const [c,s]=await Promise.all([jget("/v1/flywheel/customers"), jget("/v1/flywheel/stats")]);
+    ordState.customers=c.customers||[];
+    $("#navOrderCnt").textContent=ordState.customers.length;
+    $("#osCust").textContent=s.total_customers??0; $("#osQuotes").textContent=s.total_quotes??0;
+    $("#osWon").textContent=s.total_won??0; $("#osLost").textContent=s.total_lost??0;
+    $("#osRate").textContent=((s.overall_win_rate||0)*100).toFixed(1)+"%";
+  }catch(e){ ordState.customers=[]; tb.innerHTML=`<tr><td colspan="7"><div class="empty" style="border:0"><div class="ic">⚠️</div><b>订单数据拉取失败</b><div class="hint">${esc(e.message)}</div></div></td></tr>`; return; }
+  renderOrders();
+}
+function ordFiltered(){
+  const q=ordState.q.toLowerCase();
+  let arr=ordState.customers.filter(c=>{
+    const tq=c.total_quotes||0, tw=c.total_won||0, tl=c.total_lost||0;
+    if(ordState.filter==="WON"&&!tw) return false;
+    if(ordState.filter==="LOST"&&!tl) return false;
+    if(ordState.filter==="COLD"&&tq) return false;
+    if(q && !((c.customer_id||"").toLowerCase().includes(q)||(c.name||"").toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const key=ordState.sort;
+  arr.sort((a,b)=> key==="name" ? String(a.customer_id).localeCompare(String(b.customer_id))
+    : key==="rate" ? ((b.total_won||0)/((b.total_won||0)+(b.total_lost||0)||1)) - ((a.total_won||0)/((a.total_won||0)+(a.total_lost||0)||1))
+    : (b.total_quotes||0)-(a.total_quotes||0));
+  return arr;
+}
+function renderOrders(){
+  const list=ordFiltered(), tb=$("#ordTbody");
+  $("#ordEmpty").style.display=ordState.customers.length?"none":"block";
+  if(!list.length&&ordState.customers.length){
+    tb.innerHTML=`<tr><td colspan="7"><div class="empty" style="border:0"><div class="ic">🔍</div><b>无匹配客户</b><div class="hint">调整搜索词或筛选条件</div></div></td></tr>`;
+    $("#ordPager").innerHTML=""; return;
+  }
+  const rows=paginate(list,ordState.page,ordState.size);
+  tb.innerHTML=rows.map(c=>{
+    const tq=c.total_quotes||0,tw=c.total_won||0,tl=c.total_lost||0;
+    const rate=(tw+tl)?Math.round(tw/(tw+tl)*100):0;
+    const cid=c.customer_id||c.name||"—";
+    return `<tr data-cid="${esc(cid)}">
+      <td class="checkcol" onclick="event.stopPropagation()"><input type="checkbox" data-cid="${esc(cid)}" ${ordState.sel.has(cid)?"checked":""}/></td>
+      <td><div style="font-weight:600">${esc(c.name||cid)}</div><div class="dim sm mono">${esc(cid)}</div></td>
+      <td><b>${tq}</b> 次</td>
+      <td><span class="tag pass">won ${tw}</span> <span class="tag err">lost ${tl}</span></td>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="progress" style="width:70px"><div style="width:${rate}%"></div></div><span class="sm">${rate}%</span></div></td>
+      <td class="sm mut">${c.pricing_model?`<span class="tag vio">已建模</span>`:'<span class="dim">未建模</span>'}</td>
+      <td><button class="btn sm" data-open="${esc(cid)}">画像 ›</button></td></tr>`;
+  }).join("");
+  tb.querySelectorAll("tr[data-cid]").forEach(tr=>{
+    tr.addEventListener("click",e=>{ if(e.target.closest("button"))return; openCustomer(tr.dataset.cid); });
+    const cb=tr.querySelector("input[type=checkbox]");
+    cb.onchange=()=>{ cb.checked?ordState.sel.add(tr.dataset.cid):ordState.sel.delete(tr.dataset.cid); syncOrdBulk(); };
+    tr.querySelector("button[data-open]").onclick=()=>openCustomer(tr.dataset.cid);
+  });
+  $("#ordSelAll").checked=rows.length>0&&rows.every(c=>ordState.sel.has(c.customer_id||c.name));
+  renderPager($("#ordPager"),list.length,ordState.page,ordState.size,p=>{ordState.page=p;renderOrders();});
+  syncOrdBulk();
+}
+function syncOrdBulk(){ const n=ordState.sel.size; $("#ordBulk").style.display=n?"flex":"none"; $("#ordBulkCnt").textContent=`已选 ${n} 个客户`; }
+function ordClearSel(){ ordState.sel.clear(); renderOrders(); }
+$("#ordQ").addEventListener("input",e=>{ordState.q=e.target.value;ordState.page=1;renderOrders();});
+$$("#view-orders .chip[data-of]").forEach(c=>c.onclick=()=>{
+  $$("#view-orders .chip[data-of]").forEach(x=>x.classList.remove("on")); c.classList.add("on");
+  ordState.filter=c.dataset.of; ordState.page=1; renderOrders(); });
+$("#ordSort").addEventListener("change",e=>{ordState.sort=e.target.value;renderOrders();});
+$("#ordPageSize").addEventListener("change",e=>{ordState.size=+e.target.value;ordState.page=1;renderOrders();});
+$("#ordSelAll").addEventListener("change",e=>{
+  paginate(ordFiltered(),ordState.page,ordState.size).forEach(c=>{const cid=c.customer_id||c.name; e.target.checked?ordState.sel.add(cid):ordState.sel.delete(cid);});
+  renderOrders(); });
+function ordExportCsv(){
+  const rows=ordFiltered().filter(c=>ordState.sel.has(c.customer_id||c.name));
+  const csv="customer_id,name,quotes,won,lost,win_rate\n"+rows.map(c=>{
+    const tw=c.total_won||0,tl=c.total_lost||0;
+    return [c.customer_id||"",`"${(c.name||"").replace(/"/g,'""')}"`,c.total_quotes||0,tw,tl,(tw+tl)?(tw/(tw+tl)).toFixed(3):""].join(",");
+  }).join("\n");
+  dlBlob(csv,`orders-export-${Date.now()}.csv`,"text/csv"); toast(`已导出 ${rows.length} 个客户`);
+}
+function ordBatchOpen(){ const first=[...ordState.sel][0]; if(first) openCustomer(first); }
+async function openCustomer(cid){
+  openDrawer(`客户画像 · ${cid}`, skRow(5));
+  try{
+    const d=await jget(`/v1/flywheel/customers/${encodeURIComponent(cid)}`);
+    const pm=d.pricing_model||{}, hist=(d.history&&d.history.quotes)||[], kb=d.knowledge_base||[];
+    $("#drawerBody").innerHTML=`
+      <div class="region"><h4>💰 定价模型</h4>
+        ${Object.keys(pm).length?`<div class="kv">${Object.entries(pm).slice(0,8).map(([k,v])=>`<div class="cell"><b>${esc(k)}</b>${esc(typeof v==="number"?v.toFixed? v.toFixed(2):v:JSON.stringify(v))}</div>`).join("")}</div>`
+        :'<div class="sm dim">尚无定价模型 — 成交/丢单复盘后自动更新</div>'}</div>
+      <div class="region"><h4>📜 报价历史 (${hist.length})</h4>
+        ${hist.slice(0,8).map(q=>`<div class="sm" style="padding:5px 0;border-bottom:1px dashed var(--line)">
+          <code>${esc(q.context_id||"")}</code> · ${esc(q.material||"")} × ${q.quantity??"?"} · <b>${q.unit_price??"—"}</b> ${esc(q.currency||"")}
+          <span class="dim">${q.outcome?`· ${esc(q.outcome)}`:""}</span></div>`).join("")||'<div class="sm dim">无报价记录</div>'}</div>
+      <div class="region"><h4>🧠 客户知识 (${kb.length})</h4>
+        ${kb.slice(0,6).map(k=>`<div class="sm mut">· ${esc(k.title||k.key||JSON.stringify(k).slice(0,80))}</div>`).join("")||'<div class="sm dim">无知识条目</div>'}</div>`;
+  }catch(e){ $("#drawerBody").innerHTML=`<div class="empty"><div class="ic">⚠️</div><b>画像拉取失败</b><div class="hint">${esc(e.message)}</div></div>`; }
+}
+
+/* =================================================================
+ * 模块 3 · STEP 图纸预览
+ * ================================================================= */
+const CAD_LS="uds_cad_history";
+const cadHist=()=>{try{return JSON.parse(localStorage.getItem(CAD_LS)||"[]")}catch(e){return[]}};
+const cadSave=h=>localStorage.setItem(CAD_LS,JSON.stringify(h.slice(0,60)));
+const cadDz=$("#cadDz"), cadFile=$("#cadFile");
+cadDz.onclick=()=>cadFile.click();
+cadDz.ondragover=e=>{e.preventDefault();cadDz.classList.add("drag")};
+cadDz.ondragleave=()=>cadDz.classList.remove("drag");
+cadDz.ondrop=e=>{e.preventDefault();cadDz.classList.remove("drag"); if(e.dataTransfer.files[0]) uploadStep(e.dataTransfer.files[0]);};
+cadFile.onchange=()=>{ if(cadFile.files[0]) uploadStep(cadFile.files[0]); cadFile.value=""; };
+async function uploadStep(f){
+  if(!/\.(step|stp)$/i.test(f.name)){ toast("仅支持 .step / .stp",true); return; }
+  $("#cadResult").innerHTML=`<div style="padding:10px">${skRow(4)}<div class="sm mut" style="padding:6px 10px">⏳ 确定性内核解析 ${esc(f.name)} …</div></div>`;
+  try{
+    const fd=new FormData(); fd.append("file",f);
+    const d=await jpost("/v1/upload/step-with-thumbnail",fd,true);
+    const rec={...d, ts:Date.now()};
+    const h=cadHist().filter(x=>x.sha256_16!==d.sha256_16); h.unshift(rec); cadSave(h);
+    renderCadResult(rec); renderCadGallery();
+    $("#navCadCnt").textContent=cadHist().length;
+    toast(`📐 ${f.name} 解析完成${d.cached?" (缓存命中)":""}`);
+  }catch(e){ $("#cadResult").innerHTML=`<div class="empty" style="border:0"><div class="ic">⚠️</div><b>解析失败</b><div class="hint">${esc(e.message)}</div></div>`; }
+}
+function renderCadResult(d){
+  $("#cadResult").innerHTML=`
+    <div style="display:flex;gap:14px;flex-wrap:wrap">
+      <div style="flex:0 0 220px;background:#0a0e1c;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;justify-content:center;min-height:180px;overflow:hidden">${d.svg||'<span class="dim">无缩略图</span>'}</div>
+      <div style="flex:1;min-width:220px">
+        <b>${esc(d.filename)}</b> ${d.cached?'<span class="tag cy">缓存</span>':""} <span class="tag">${esc(d._source||"kernel")}</span>
+        <div class="kv" style="margin-top:10px">
+          <div class="cell"><b>BBOX (mm)</b>${d.bbox?d.bbox.map(x=>Math.round(x*10)/10).join(" × "):"—"}</div>
+          <div class="cell"><b>体积</b>${d.volume_cm3??"—"} cm³</div>
+          <div class="cell"><b>质量</b>${d.mass_g??"—"} g</div>
+          <div class="cell"><b>特征数</b>${d.features_count??"—"}</div>
+          <div class="cell"><b>SHA256</b><span class="mono">${esc(d.sha256_16||"—")}</span></div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn sm primary" onclick="cadSimilar('${esc(d.filename)}')">🔍 检索相似案例</button>
+          <button class="btn sm" onclick="switchView('raglib')">📥 入库 RAG</button>
+        </div>
+      </div>
+    </div>`;
+}
+function cadSimilar(name){
+  switchView("rag"); $("#ragQ").value=name.replace(/\.(step|stp)$/i,"");
+  setTimeout(ragSearch,150);
+}
+function renderCadGallery(){
+  const q=($("#cadQ").value||"").toLowerCase();
+  const h=cadHist().filter(r=>!q||(r.filename||"").toLowerCase().includes(q)||(r.sha256_16||"").includes(q));
+  $("#navCadCnt").textContent=cadHist().length;
+  $("#cadEmpty").style.display=cadHist().length?(h.length?"none":"block"):"block";
+  $("#cadEmpty").innerHTML = cadHist().length
+    ? '<div class="ic">🔍</div><b>无匹配图纸</b><div class="hint">调整搜索词</div>'
+    : '<div class="ic">🗄</div><b>暂无解析历史</b><div class="hint">解析过的图纸会缓存在本地 (含 sha256 去重), 可一键检索相似案例</div>';
+  $("#cadGallery").innerHTML=h.map((r,i)=>`
+    <div class="gcard">
+      <div class="pv">${r.svg||'<span class="dim sm">无缩略图</span>'}</div>
+      <div class="gi">
+        <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.filename)}</div>
+        <div class="mut sm">${r.volume_cm3??"—"} cm³ · ${r.features_count??"—"} 特征 · ${fmtT(r.ts/1000)}</div>
+        <div style="margin-top:7px;display:flex;gap:6px">
+          <button class="btn sm" data-i="${i}" data-act="view">查看</button>
+          <button class="btn sm" data-i="${i}" data-act="sim">相似</button>
+          <button class="btn sm danger" data-i="${i}" data-act="del">删</button>
+        </div>
+      </div>
+    </div>`).join("");
+  $("#cadGallery").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    const rec=h[+b.dataset.i];
+    if(b.dataset.act==="view") renderCadResult(rec);
+    else if(b.dataset.act==="sim") cadSimilar(rec.filename);
+    else { cadSave(cadHist().filter(x=>x.sha256_16!==rec.sha256_16)); renderCadGallery(); }
+  });
+}
+$("#cadQ").addEventListener("input",renderCadGallery);
+function cadClearHistory(){ cadSave([]); renderCadGallery(); toast("已清空图纸历史"); }
+
+/* =================================================================
+ * 模块 4 · 客户 RAG 搜索
+ * ================================================================= */
+$("#ragWeb").addEventListener("click",e=>e.target.classList.toggle("on"));
+$("#ragQ").addEventListener("keydown",e=>{if(e.key==="Enter")ragSearch();});
+async function ragSearch(){
+  const q=$("#ragQ").value.trim();
+  if(!q){ toast("请输入检索词",true); return; }
+  const cid=$("#ragCust").value.trim(), limit=$("#ragLimit").value, web=$("#ragWeb").classList.contains("on");
+  $("#ragEmpty").style.display="none";
+  $("#ragResults").innerHTML=skRow(4);
+  const hits=[];
+  try{
+    const d=await jget(`/v1/rag/search?q=${encodeURIComponent(q)}&limit=${limit}${cid?`&customer_id=${encodeURIComponent(cid)}`:""}`);
+    (d.hits||d.results||[]).forEach(h=>{
+      const p=h.payload||{};
+      hits.push({src:p.kind||"ingest_docs",tag:"vio",title:p.title||p.doc_name||p.id||h.id||"文档片段",
+        snippet:p.text||h.text||h.snippet||"",score:h.score,cust:p.customer_id});
+    });
+  }catch(e){ hits.push({_err:e.message}); }
+  if(web){
+    try{
+      const r=await jpost("/v1/agent/route",{intent:`websearch ${q}`,files:[]});
+      const skills=(r.skills||r.route||[]).map(s=>s.skill_id||s.name||s).join(" → ");
+      hits.unshift({src:"联网补全",tag:"cy",title:"🌐 联网信息 (omni 整合路由预览)",
+        snippet:`路由链: ${skills||"websearch → omni-summarize"} · omni 模型将基于公开信息补全客户背景/市场情报, 经门禁后落库。`,
+        score:null,cust:null});
+    }catch(e){ hits.unshift({src:"联网补全",tag:"cy",title:"🌐 联网信息",snippet:"联网路由不可用: "+e.message,score:null}); }
+  }
+  if(!hits.length){
+    $("#ragResults").innerHTML=`<div class="empty"><div class="ic">🔍</div><b>无召回结果</b>
+      <div class="hint">换个关键词, 或先在「多模态 RAG 库」入库相关文档${web?"":"; 也可开启联网补全"}</div></div>`; return;
+  }
+  $("#ragResults").innerHTML=hits.map(h=>h._err
+    ?`<div class="empty"><div class="ic">⚠️</div><b>检索失败</b><div class="hint">${esc(h._err)}</div></div>`
+    :`<div class="search-hit">
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="tag ${h.tag} src">${esc(h.src)}</span>
+        <b style="font-size:13px">${esc(h.title)}</b>
+        ${h.score!=null?`<span class="tag cy">${(+h.score).toFixed(3)}</span>`:""}
+        ${h.cust?`<span class="tag">👤 ${esc(h.cust)}</span>`:""}
+      </div>
+      <div class="sm mut" style="margin-top:6px">${esc(String(h.snippet).slice(0,300))}</div>
+    </div>`).join("");
+}
+
+/* =================================================================
+ * 模块 5 · 多模态 RAG 库
+ * ================================================================= */
+const ragDocState={docs:[],q:"",cust:"",page:1,size:8,sel:new Set()};
+const ragDz=$("#ragDz"), ragFile=$("#ragFile");
+ragDz.onclick=()=>ragFile.click();
+ragDz.ondragover=e=>{e.preventDefault();ragDz.classList.add("drag")};
+ragDz.ondragleave=()=>ragDz.classList.remove("drag");
+ragDz.ondrop=e=>{e.preventDefault();ragDz.classList.remove("drag"); ingestFiles(e.dataTransfer.files);};
+ragFile.onchange=()=>{ ingestFiles(ragFile.files); ragFile.value=""; };
+function ragLog(msg){
+  const lb=$("#ragInLog"); lb.style.display="block";
+  lb.innerHTML+=`<div><span class="t">${new Date().toLocaleTimeString()}</span> ${esc(msg)}</div>`;
+  lb.scrollTop=lb.scrollHeight;
+}
+async function ingestFiles(files){
+  const cid=$("#ragInCust").value.trim(), tags=$("#ragInTags").value.trim();
+  for(const f of files){
+    ragLog(`⏳ 入库 ${f.name} …`);
+    try{
+      const fd=new FormData(); fd.append("file",f);
+      if(cid) fd.append("customer_id",cid); if(tags) fd.append("tags",tags);
+      const d=await jpost("/v1/rag/ingest",fd,true);
+      ragLog(`✔ ${f.name} → ${d.chunks??d.chunk_count??"?"} chunks ${d.ok===false?"⚠ "+(d.reason||""):""}`);
+    }catch(e){ ragLog(`✖ ${f.name}: ${e.message}`); }
+  }
+  toast("入库流程结束"); loadRagDocs(true);
+}
+async function loadRagDocs(force){
+  const tb=$("#ragDocTbody");
+  if(force||!ragDocState.docs.length) tb.innerHTML=`<tr><td colspan="8">${skRow(4)}</td></tr>`;
+  try{
+    const cf=ragDocState.cust?`?customer_id=${encodeURIComponent(ragDocState.cust)}`:"";
+    const d=await jget("/v1/rag/docs"+cf);
+    ragDocState.docs=d.docs||[];
+  }catch(e){ ragDocState.docs=[];
+    tb.innerHTML=`<tr><td colspan="8"><div class="empty" style="border:0"><div class="ic">⚠️</div><b>文档库不可用</b><div class="hint">${esc(e.message)}</div></div></td></tr>`;
+    $("#ragDocEmpty").style.display="none"; return; }
+  renderRagDocs();
+}
+function ragDocFiltered(){
+  const q=ragDocState.q.toLowerCase();
+  return ragDocState.docs.filter(d=>{
+    if(q && !((d.doc_name||d.name||"").toLowerCase().includes(q)||(d.tags||[]).join(" ").toLowerCase().includes(q)||(d.doc_id||d.id||"").toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+function modalityOf(name){
+  const ext=(name||"").split(".").pop().toLowerCase();
+  const m={step:["图纸","cy"],stp:["图纸","cy"],pdf:["PDF","warn"],eml:["邮件","vio"],wav:["语音","acc"],mp3:["语音","acc"],m4a:["语音","acc"],
+    png:["图片","warn"],jpg:["图片","warn"],jpeg:["图片","warn"],xlsx:["表格","pass"],xls:["表格","pass"],csv:["表格","pass"],txt:["文本",""],md:["文本",""],zip:["压缩包",""]};
+  const [lb,cls]=m[ext]||["文件",""];
+  return `<span class="tag ${cls}">${lb}</span>`;
+}
+function renderRagDocs(){
+  const list=ragDocFiltered(), tb=$("#ragDocTbody");
+  $("#ragDocEmpty").style.display=ragDocState.docs.length?"none":"block";
+  if(!list.length&&ragDocState.docs.length){
+    tb.innerHTML=`<tr><td colspan="8"><div class="empty" style="border:0"><div class="ic">🔍</div><b>无匹配文档</b><div class="hint">调整搜索词</div></div></td></tr>`;
+    $("#ragDocPager").innerHTML=""; return;
+  }
+  const rows=paginate(list,ragDocState.page,ragDocState.size);
+  tb.innerHTML=rows.map(d=>{
+    const id=d.doc_id||d.id||"", name=d.doc_name||d.name||id;
+    const chunks=d.chunks??d.chunk_count;
+    const ts=d.ingested_at||d.created_at||d.indexed_at;
+    return `<tr>
+      <td class="checkcol"><input type="checkbox" data-id="${esc(id)}" ${ragDocState.sel.has(id)?"checked":""}/></td>
+      <td><div style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600">${esc(name)}</div>
+          <div class="dim sm mono">${esc(id).slice(0,22)}</div></td>
+      <td>${modalityOf(name)}</td>
+      <td>${d.customer_id?`<span class="tag">👤 ${esc(d.customer_id)}</span>`:'<span class="dim sm">全局</span>'}</td>
+      <td>${(d.tags||[]).slice(0,3).map(t=>`<span class="tag cy">${esc(t)}</span>`).join(" ")||'<span class="dim sm">—</span>'}</td>
+      <td class="sm">${chunks??"—"}${d.chars?` <span class="dim">(${d.chars}字)</span>`:""}</td>
+      <td class="mut sm">${ts?fmtT(ts):"—"}</td>
+      <td><button class="btn sm danger" data-del="${esc(id)}">删除</button></td></tr>`;
+  }).join("");
+  tb.querySelectorAll("input[type=checkbox][data-id]").forEach(cb=>cb.onchange=()=>{
+    cb.checked?ragDocState.sel.add(cb.dataset.id):ragDocState.sel.delete(cb.dataset.id); syncRagBulk(); });
+  tb.querySelectorAll("button[data-del]").forEach(b=>b.onclick=()=>ragDelete(b.dataset.del));
+  $("#ragSelAll").checked=rows.length>0&&rows.every(d=>ragDocState.sel.has(d.doc_id||d.id));
+  renderPager($("#ragDocPager"),list.length,ragDocState.page,ragDocState.size,p=>{ragDocState.page=p;renderRagDocs();});
+  syncRagBulk();
+}
+function syncRagBulk(){ const n=ragDocState.sel.size; $("#ragBulk").style.display=n?"flex":"none"; $("#ragBulkCnt").textContent=`已选 ${n} 篇`; }
+function ragClearSel(){ ragDocState.sel.clear(); renderRagDocs(); }
+$("#ragDocQ").addEventListener("input",e=>{ragDocState.q=e.target.value;ragDocState.page=1;renderRagDocs();});
+$("#ragDocCust").addEventListener("change",e=>{ragDocState.cust=e.target.value.trim();ragDocState.page=1;loadRagDocs(true);});
+$("#ragDocPageSize").addEventListener("change",e=>{ragDocState.size=+e.target.value;ragDocState.page=1;renderRagDocs();});
+$("#ragSelAll").addEventListener("change",e=>{
+  paginate(ragDocFiltered(),ragDocState.page,ragDocState.size).forEach(d=>{const id=d.doc_id||d.id; e.target.checked?ragDocState.sel.add(id):ragDocState.sel.delete(id);});
+  renderRagDocs(); });
+async function ragDelete(id){
+  try{ await jdel(`/v1/rag/docs/${encodeURIComponent(id)}`); ragDocState.sel.delete(id); toast("已删除"); loadRagDocs(true); }
+  catch(e){ toast("删除失败: "+e.message,true); }
+}
+async function ragBatchDelete(){
+  const ids=[...ragDocState.sel]; if(!ids.length) return;
+  let ok=0; for(const id of ids){ try{ await jdel(`/v1/rag/docs/${encodeURIComponent(id)}`); ok++; ragDocState.sel.delete(id);}catch(e){} }
+  toast(`批量删除 ${ok}/${ids.length}`); loadRagDocs(true);
+}
+
+/* =================================================================
+ * 模块 6 · 模型设置
+ * ================================================================= */
+const MODEL_KEYS=[
+  {key:"vlm",   name:"omni · 多模态推理", icon:"🧠", primary:true,  desc:"图纸/图片感知 + 多模态理解, 只出事实不定价"},
+  {key:"llm",   name:"LLM · 推理/文本",  icon:"💬", primary:false, desc:"RFQ 抽取 / ReAct 规划 / 回复草稿 / 摘要"},
+  {key:"embedding",name:"Embedding · 检索向量",icon:"🧭",primary:true,desc:"历史 RFQ/案例/邮件/语音 transcript 向量化 (RAG 核心)"},
+  {key:"asr",   name:"ASR · 语音转写",   icon:"🎙", primary:false, desc:"语音/视频客户约束转写"},
+  {key:"ocr",   name:"OCR · 图纸文字",   icon:"🔠", primary:false, desc:"PDF/图纸文字识别兜底"},
+  {key:"deterministic",name:"确定性内核 · 报价/DFM",icon:"🛡",primary:false,locked:true,desc:"CNC-AI-Brain v12 · 铁律① 锁定不可禁用"},
+];
+let modelCfg=null;
+async function loadModels(force){
+  const box=$("#modelCards");
+  box.innerHTML=`<div class="mut sm" style="margin-bottom:10px">⏳ 正在在线探测各模型端点 (不可达端点将等待超时, 约 5-15s)…</div>
+    <div class="cols grid2"><div class="sk" style="height:180px"></div><div class="sk" style="height:180px"></div></div>`;
+  try{ const d=await jget("/v1/models/config"); modelCfg=d.config||{}; renderModels(d.probe||{}); $("#modelEmpty").style.display="none"; }
+  catch(e){ box.innerHTML=""; $("#modelEmpty").style.display="block"; }
+}
+function renderModels(probe){
+  const models=(modelCfg&&modelCfg.models)||{};
+  const gw=(modelCfg&&modelCfg.funasr_gateway)||null;
+  $("#modelCards").innerHTML=MODEL_KEYS.map(mk=>{
+    const m=models[mk.key]||{}, p=(probe&&probe[mk.key])||{};
+    const online=p.online===true, probed=p.online!==undefined;
+    return `<div class="model-card ${mk.locked?"locked":""} ${mk.primary?"primary-model":""}" data-key="${mk.key}">
+      <div class="mh">
+        <span style="font-size:18px">${mk.icon}</span>
+        <b>${esc(m.label||mk.name)}</b>
+        ${mk.primary?'<span class="tag acc">主栈</span>':""}
+        ${mk.locked?'<span class="tag hitl">🔒 锁定</span>':""}
+        <span class="spacer"></span>
+        <span class="pill ${probed?(online?"on":"err"):""}" data-probe-pill>${probed?(online?"● 在线":"● 离线"):"未探测"}</span>
+        <div class="switch ${m.enabled!==false?"on":""} ${mk.locked?"dis":""}" data-sw title="${mk.locked?"铁律锁定":""}"></div>
+      </div>
+      <div class="sm mut">${mk.desc}</div>
+      <div class="sm" style="margin-top:4px">role: <code>${esc(m.role||"—")}</code> ${p.latency_ms?`· 时延 <b>${p.latency_ms}</b>ms`:""}</div>
+      <label>端点</label><input class="inp mono" data-f="endpoint" value="${esc(m.endpoint||"")}" ${mk.locked?"disabled":""}/>
+      <label>模型</label><input class="inp mono" data-f="model" value="${esc(m.model||"")}" ${mk.locked?"disabled":""}/>
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+        <button class="btn sm" data-probe="${mk.key}">📡 探测</button>
+        ${mk.locked?'<span class="sm mut">🔒 iron-rule-1 强制锁定, 不可禁用</span>':""}
+      </div>
+    </div>`;
+  }).join("")+(gw?`<div class="model-card"><div class="mh"><span style="font-size:18px">🎧</span><b>FunASR 网关</b><span class="tag vio">多模态</span></div>
+      <div class="sm mut">语音/视频客户约束转写网关 (funasr-gui)</div>
+      <label>端点</label><input class="inp mono" value="${esc(gw.endpoint||"")}" disabled/></div>`:"");
+  $("#modelCards").querySelectorAll(".model-card[data-key]").forEach(card=>{
+    const key=card.dataset.key, mk=MODEL_KEYS.find(x=>x.key===key);
+    if(!mk.locked){
+      card.querySelector("[data-sw]").onclick=e=>e.target.classList.toggle("on");
+      card.querySelectorAll("input[data-f]").forEach(inp=>inp.oninput=()=>{ /* dirty tracked at save */ });
+    }
+    card.querySelector("[data-probe]").onclick=()=>probeOne(key,card);
+  });
+}
+async function probeOne(key,card){
+  const pill=card.querySelector("[data-probe-pill]"); pill.textContent="探测中…"; pill.className="pill";
+  try{
+    const fd=new FormData(); fd.append("key",key);
+    const d=await jpost("/v1/models/probe",fd,true);
+    const p=d[key]||{};
+    pill.textContent=p.online?`● 在线 ${p.latency_ms??""}ms`:"● 离线";
+    pill.className="pill "+(p.online?"on":"err");
+  }catch(e){ pill.textContent="探测失败"; pill.className="pill err"; }
+}
+async function probeAll(){ $$("#modelCards .model-card[data-key]").forEach(c=>probeOne(c.dataset.key,c)); }
+async function saveModels(){
+  if(!modelCfg){ toast("配置未加载",true); return; }
+  const out=JSON.parse(JSON.stringify(modelCfg));
+  $$("#modelCards .model-card[data-key]").forEach(card=>{
+    const key=card.dataset.key; if(!out.models[key]) return;
+    out.models[key].endpoint=card.querySelector('[data-f="endpoint"]').value.trim();
+    out.models[key].model=card.querySelector('[data-f="model"]').value.trim();
+    out.models[key].enabled=card.querySelector("[data-sw]").classList.contains("on");
+  });
+  try{
+    const d=await jpost("/v1/models/config",out);
+    modelCfg=d.config||out; renderModels(d.probe||{});
+    toast("💾 模型配置已保存 (控制器将按新配置重建)");
+  }catch(e){ toast("保存失败: "+e.message,true); }
+}
+
+/* =================================================================
+ * 模块 7 · 本地状态
+ * ================================================================= */
+let stTimer=null;
+$("#stAuto").addEventListener("click",e=>{
+  const on=e.target.classList.toggle("on");
+  if(on){ stTimer=setInterval(loadStatus,10000); } else { clearInterval(stTimer); }
+});
+async function loadStatus(){
+  /* health */
+  try{
+    const h=await jget("/health");
+    $("#stApi").textContent="OK"; $("#stApiFt").textContent=h.service||"/health";
+    $("#stEngine").textContent=(h.engine||"—").slice(0,26); $("#stEngineFt").textContent=`contexts ${h.contexts??0}`;
+    $("#stMM").textContent=(h.multimodal||"—").slice(0,26); $("#stMMFt").textContent=h.version||"";
+    $("#pillVer").textContent=h.version||"—";
+  }catch(e){ $("#stApi").textContent="ERR"; $("#stApiFt").textContent=e.message; }
+  /* v12 */
+  try{
+    const v=await jget("/v1/v12/status");
+    $("#stV12Pill").textContent=v.alive!==false?"🟢 alive":"🔴 offline";
+    $("#stV12Pill").className="pill sm "+(v.alive!==false?"on":"err");
+    $("#stV12").innerHTML=["version","source","quotes","cache_hit_rate","uptime_s","kernel"].filter(k=>v[k]!==undefined)
+      .map(k=>`<div class="cell"><b>${k}</b>${esc(typeof v[k]==="number"?(+v[k]).toFixed?v[k]:v[k]:String(v[k]).slice(0,40))}</div>`).join("")
+      || `<div class="cell"><b>raw</b><span class="mono">${esc(JSON.stringify(v)).slice(0,160)}</span></div>`;
+    const r=+(v.cache_hit_rate||0); $("#stV12Bar").style.width=Math.min(100,r*100)+"%";
+    $("#stV12Ft").textContent=`quotes ${v.quotes??"—"} · cache hit ${(r*100).toFixed(0)}%`;
+  }catch(e){ $("#stV12").innerHTML=`<div class="cell"><b>error</b>${esc(e.message)}</div>`; }
+  /* v12 audit */
+  try{
+    const a=await jget("/v1/v12/audit?limit=12");
+    const items=a.items||a.audit||[];
+    $("#stAudit").innerHTML=items.length?items.map(x=>`<div><span class="t">${esc(x.ts||x.time||"")}</span> ${esc(x.action||x.event||JSON.stringify(x)).slice(0,140)}</div>`).join(""):"<div class='dim'>无审计流水</div>";
+  }catch(e){ $("#stAudit").textContent="audit 不可用: "+e.message; }
+  /* router */
+  try{
+    const r=await jget("/v1/model-router/status");
+    const lanes=r.lanes||r;
+    $("#stRouter").innerHTML=Object.entries(lanes).slice(0,8).map(([k,v])=>{
+      const on=v&&(v.online===true||v.enabled===true||v==="ok"||v==="online");
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px dashed var(--line);font-size:12px">
+        <span class="dot ${on?"on":"off"}" style="margin:0"></span><b style="width:110px">${esc(k)}</b>
+        <span class="mut mono" style="flex:1;overflow:hidden;text-overflow:ellipsis">${esc(v&&v.model||v&&v.endpoint||typeof v==="string"?v:JSON.stringify(v)).slice(0,60)}</span></div>`;
+    }).join("")||'<div class="dim sm">无路由信息</div>';
+  }catch(e){ $("#stRouter").innerHTML=`<div class="sm dim">router 不可用: ${esc(e.message)}</div>`; }
+  /* cache */
+  try{
+    const c=await jget("/v1/cache/stats");
+    $("#stCache").textContent=((c.hit_rate||0)*100).toFixed(0)+"%";
+    $("#stCacheFt").textContent=`${c.size}/${c.max_size} · hit ${c.hits} / miss ${c.misses}`;
+  }catch(e){ $("#stCache").textContent="—"; $("#stCacheFt").textContent=e.message; }
+  /* mail puller + gmail */
+  try{
+    const [p,g]=await Promise.all([jget("/v1/mail/puller/status"), jget("/v1/gmail/status").catch(()=>null)]);
+    $("#stMail").innerHTML=`
+      <div class="cell"><b>puller</b>${esc(p.state||p.status||(p.running?"running":"—"))}</div>
+      <div class="cell"><b>pending</b>${p.pending??p.pending_count??"—"}</div>
+      <div class="cell"><b>mailbox</b><span class="mono" style="font-size:10px">${esc(p.mailbox_dir||p.dir||"data/mailbox").slice(0,28)}</span></div>
+      <div class="cell"><b>gmail</b>${g?esc(g.connected?"已连接":"未连接"):"—"}</div>`;
+  }catch(e){ $("#stMail").innerHTML=`<div class="cell"><b>error</b>${esc(e.message)}</div>`; }
+  /* nim */
+  try{
+    const n=await jget("/v1/nim/health");
+    const entries=n.endpoints?Object.entries(n.endpoints):Object.entries(n);
+    $("#stNim").innerHTML=entries.slice(0,6).map(([k,v])=>
+      `<div style="padding:4px 0;border-bottom:1px dashed var(--line)"><span class="dot ${v&&(v.online||v==="ok")?"on":"off"}" style="margin:0 6px 0 0"></span><code>${esc(k)}</code> <span class="mut">${esc(v&&v.model||v&&v.status||typeof v==="string"?v:"").slice(0,40)}</span></div>`).join("")
+      ||`<pre style="margin:0">${esc(JSON.stringify(n)).slice(0,300)}</pre>`;
+  }catch(e){ $("#stNim").innerHTML=`<span class="dim">NIM 不可用: ${esc(e.message)}</span>`; }
+}
+
+/* =================================================================
+ * 抽屉 / 工具
+ * ================================================================= */
+function openDrawer(title,html){ $("#drawerTitle").textContent=title; $("#drawerBody").innerHTML=html||"";
+  $("#drawer").classList.add("show"); $("#drawerMask").classList.add("show"); }
+function closeDrawer(){ $("#drawer").classList.remove("show"); $("#drawerMask").classList.remove("show"); }
+function dlBlob(text,name,mime){ const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob(["﻿"+text],{type:(mime||"text/csv")+";charset=utf-8"}));
+  a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),3000); }
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeDrawer(); });
+
+/* ---------- 启动 ---------- */
+(async function boot(){
+  try{
+    const h=await jget("/health");
+    $("#pillApi").textContent="API ✓"; $("#pillApi").className="pill on";
+    $("#pillEngine").textContent=h.engine||"engine"; $("#pillEngine").className="pill "+(String(h.engine).includes("live")?"on":"warn");
+    $("#pillVer").textContent=h.version||"—";
+    $("#sideDot").className="dot on"; $("#sideStatus").textContent="已连接 · "+(h.version||"");
+  }catch(e){
+    $("#pillApi").textContent="API ✗"; $("#pillApi").className="pill err";
+    $("#sideDot").className="dot off"; $("#sideStatus").textContent="连接失败 — 请启动后端服务";
+  }
+  loadInbox(); renderCadGallery();
+})();
+</script>
+</body>
+</html>

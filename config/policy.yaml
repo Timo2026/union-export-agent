@@ -1,0 +1,137 @@
+# Union Export Agent — deterministic business policy (L8 Control Plane)
+# 这些是"业务真相", 不交给 LLM。Verification / State Machine 依此裁决。
+
+# ---- 精度等级 → 风险分级 (S5: TC4+IT5 → HITL) ----
+tolerance:
+  economic_grades: [IT7, IT8, IT9, IT10]     # 常规 CNC 经济公差 → 可自动
+  precision_grades: [IT4, IT5, IT6]          # 超经济公差 → 需精密磨削/慢走丝 → HITL
+  hitl_grades: [IT4, IT5]                    # 强制人工复核 (对齐验收集 S5)
+
+# ---- 毛利红线 (止: 熔断) ----
+margin:
+  floor_pct: 15.0          # 毛利率低于此 → BLOCKED
+  target_pct: 30.0
+  review_below_pct: 20.0   # 低于此 → HITL 商务确认
+
+# ---- 金额门禁 (对齐 main_lite AMOUNT_GATE_THRESHOLD 思想) ----
+amount_gate:
+  unit_price_review_cny: 12000.0   # 单件报价超此 → 商务确认 HITL
+  total_price_review_cny: 100000.0
+
+# ---- DFM 硬冲突 (辟) ----
+dfm:
+  hard_conflict_action: BLOCKED    # conflict_check.valid==false → 直接 BLOCKED
+  warning_action: HITL             # 仅 warning → 人工确认
+
+# ---- 多模态冲突 (M1: Voice↔Email 关键尺寸不一致) ----
+multimodal:
+  conflict_action: HITL
+  never_silent_overwrite: true
+  tolerance_delta_mm: 0.005        # 关键尺寸差异超此阈值 → VOICE_EMAIL_CONFLICT
+  size_conflict_ratio: 2.0         # 图纸 bbox 与文字尺寸 最大边比值超此 → GEO_TEXT_SIZE_CONFLICT
+  # 依据: 图纸优先于文字(cat_controller 用 bbox 覆写 dimensions_mm)是合理默认,
+  #   但客户可能只寄了简化示意图 → 实际件更大却被图纸算成小件 → 报价偏离。
+  #   比值 2.0 是保守阈值: 存量 13 个双尺寸样本中 >2 的为 0 (最大比值 1.25)。
+
+# ---- 大件转人工 (TIM 2026-09-23: 7862 只适合中小件, 太大件算不准) ----
+# 依据(非拍脑袋): timo_engine/app/main.py:961 尺寸评估 max_d>500 → "大尺寸, 需大行程机床" score=75;
+#   main_lite.py:247 7075 尺寸分档只覆盖 200<max_dim<=500, >500 无分档系数 → 大件价格无校准支撑。
+# 存量核对: 277 个有尺寸样本中 >500mm 为 0 (max=260) → 不影响任何现有单据。
+oversize:
+  max_dim_hitl_mm: 500.0      # 最大尺寸超此 → HITL: 不出价, 邮件标注转人工
+  show_estimate_anyway: false # 大件绝不外发估算价(即便引擎返回了)
+
+# ---- HITL 门禁总则 ----
+hitl:
+  auto_send_allowed_only_when:
+    - no_dfm_hard_conflict
+    - no_multimodal_conflict
+    - margin_above_floor
+    - tolerance_not_precision
+    - amount_below_gate
+    - evidence_sufficient
+  # ---- v6.3.x G1: 审批超时升级 (对照外部方案风险②: 审核人不在线 → 回复延迟) ----
+  timeout_hours: 2.0            # HITL 等待超此时长 → 升级通知备用审核人
+  backup_approvers: []          # 升级通知对象 (notify 渠道地址); 空 = 仅落审计不通知
+
+# ---- 外部发送策略 ----
+external_send:
+  require_approval_when: [high_value, precision, conflict, blocked]
+  default: draft_only          # 默认只生成草稿, 不自动发信
+
+# ---- v2.3.0 自动报价阈值 (叠加非替换) ----
+# 几何特征数 + 工艺路线步数 双双小于阈值 → 可走 AUTO 路径；
+# 与现有 IT4/IT5/毛利/金额/缺失项/多模态冲突 HITL 是叠加关系（任一不满足仍 HITL）。
+# features_count 来自 step-analysis 的 C1 特征（hole_count 等）。
+# process_route_count 来自报价内核的 process_route 字段（若无则按 0）。
+auto_quote_threshold:
+  features_count_max: 10
+  process_route_max: 10
+
+# ---- 客户飞轮配置 (v6.1) ----
+flywheel:
+  pricing:
+    enabled: true
+    learning_rate: 0.1
+    min_history: 3
+    max_adjustment_pct: 5.0
+    default_margin: 25.0
+  followup:
+    enabled: true
+    auto_suggest: true
+  retention:
+    enabled: true
+    auto_adjust_on_loss: true
+    knowledge_feedback: true
+  sandbox:
+    enabled: true
+    isolation_level: full
+    cross_reference_allowed: false
+
+# ---- 2026-09-24 邮件过滤层 (节点 inv12 实测: 50 封仅 1 封真询价却全部入链) ----
+# 分类规则实现在 services/mail_classifier.py (确定性打分, 词表默认值即代码常量);
+# 此处只放行为旋钮 — 缺省一切键 = 用代码默认 (fail-safe: 配置坏 → 不过滤不丢邮件)。
+mail_filter:
+  enabled: true                 # false = 不过滤 (全部按询价, .expert 逃生门)
+  gray_zone_action: skip_review # 灰区动作: skip_review=跳过+待复核徽标 | process=放行
+  mark_read_on_terminal: true   # 管道终态 (DONE/BLOCKED/FAILED/DEAD/SKIPPED) 后
+                                # 才标 IMAP \Seen — 处理前绝不标 (崩溃可重拉不丢信)
+  # cad_container_action: gray  # CAD 容器附件(zip/pdf/dwg 图纸包)豁免动作:
+                                # gray=弱负叠加时降灰区待复核(默认, 防营销信混入)
+                                # rfq=直入黄金链(全自动档; 强负标记仍决定性 skip)
+  # positive_terms/strong_negative_terms/weak_negative_terms/cad_extensions
+  # cad_container_extensions 词表默认值见 mail_classifier.py 顶部常量,
+  # 可在此覆盖 (list 非空即替换)。
+
+# ---- v2.4.0 报价门禁分级 (2026-09-25, TIMO: "邮件门禁太高了, 降低") ----
+# 实测依据 (非拍脑袋):
+#   1) opc-fusion-quote: 只给 -m/-l/-w/-h 即出价 — 7075 100×50×20 q1 → ¥118.94,
+#      --surface/--tolerance 缺省走 "无"/IT8, 完全不阻塞。
+#   2) 7862 CNC 内核: 仅 {material,length,width,height} → 完整报价
+#      (默认 三轴CNC / IT8 / Ra1.6 / 30% 毛利), unit=281.25, valid=true。
+#   3) 反例: 客户 RFQ-20260925-F7665D 引擎已用默认 6061 出价 (281.25),
+#      仍被 verification.py 的"缺字段即 HITL"挂住 ⇒ 门禁严于引擎能力。
+# 分级: 缺"可默认字段"(表面处理/公差) → 按默认值出价 + 报价单显式列假设;
+#       缺"阻塞字段"(材料/数量/几何) → 不出价, 自动发澄清邮件 (无价格, 无价签)。
+# 毛利红线 / 金额门禁 / 精密公差(IT4/IT5) HITL / DFM 硬冲突 一律保留, 不因本项放宽。
+quote_gate:
+  enabled: true                    # false = 回到"缺字段即 HITL"旧行为 (逃生门)
+  blocking_fields: [material, quantity, dimensions]
+  defaultable:
+    surface_finish: 无             # 机加表面 (as-machined)
+    tolerance: IT8                # 常规 CNC 经济公差 (economic_grades 内)
+  auto_clarify_enabled: true      # 阻塞字段缺失 → 自动发澄清邮件
+  auto_clarify_cooldown_hours: 24 # 同 context 冷却, 防对客户重复轰炸
+  # v2.5.0 (2026-09-26, TIMO: "完成订单自动报价") — 真报价单自动外发。
+  # 实现: mail_orchestrator._try_auto_quote (8 道闸, 任一不过 → 不发送,
+  # 邮件留 DONE 等人工 POST /v1/rfq/{cid}/send-reply)。铁律①不变: cat_controller
+  # 草稿层仍是 draft_only, 黄金回归/openshell 零回归 — 发送决策在 orchestrator。
+  # 闸: ①本开关 ②status==PASS (等价 policy.hitl.auto_send_allowed_only_when
+  # 六项全过, 逐项复用不重写) ③unit_price>0 且 final_price 存在 ④落盘
+  # guardrail_output.pass ⑤正文原样含 unit_price/final_price (LLM 改写须原数)
+  # ⑥auto_quote_threshold (features/process_route 双低于阈值) ⑦收件人!=本账号
+  # (自环防御) ⑧同 context_id 幂等只发一次。
+  # 不可放开的红线仍由 verification.py 熔断: 毛利<15% / 金额门禁 / IT4·IT5 /
+  # DFM 硬冲突 → 那些走不到 PASS, 自然进不了本路径。
+  auto_quote_send_enabled: true
+

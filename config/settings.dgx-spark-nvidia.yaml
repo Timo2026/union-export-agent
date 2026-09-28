@@ -1,0 +1,134 @@
+# 节点 Profile 覆盖源 · DGX Spark GB10 实测口径 (v4 · 2026-09-21)
+#
+# 性质 (PRD-P0-NODE-ALIGNMENT §3.3/§6.4 + PRD-S-MODEL B9/F2):
+#   本文件**不被代码加载** —— services/config.py:19-21 只读 config/settings.yaml。
+#   它是 ops 约定 / 阶段 3 部署的「覆盖源」参考件: 部署时以本文为准, 行级外科修补
+#   节点上的 config/settings.yaml + config/models.yaml (后者才是 model_router 的运行时驱动)。
+#   铁律: DETERMINISTIC 永远 Timo; 本文件不承载任何密钥/密码/IP 字面量。
+#
+# 节点实测拓扑 (v2 · 2026-09-22, user 拍板「放弃 30B, 全部接 Omni 30B」):
+#   REASON/FAST -> :8002  nemotron-omni-30b-a3b   Omni-30B-A3B NVFP4 (统一推理端点; 30B 内存争抢 crash-loop 已弃用)
+#   VISION      -> :8002  nemotron-omni-30b-a3b   Omni-30B-A3B NVFP4 (any-to-any 多模态)
+#   ASR         -> :8002  nemotron-omni-30b-a3b   Omni 音频路径 (专档流式未部署, 蹭 Omni)
+#   EMBED       -> :8011  nemotron-embed-1b       Embed-1B NVFP4 (非对称双塔, 需 query:/passage: 前缀)
+#   DETERMINISTIC -> Timo 引擎 :7862 (铁律①锁死, 永不走 LLM)
+#
+#   注: 节点实跑 = vLLM 进程级 (无 docker 权限, NIM 容器线不可行)。NIM 容器参考端口
+#       与本机开发口径 (LMStudio/旧 embed/旧 ASR/funasr 网关) 均不适用于节点, 已全量清除。
+#   注: backend=local 时 model_router.py:94-103 经 choose_route() 读 config/models.yaml,
+#       **不读下方 roles** (roles_cfg 在 local 模式为死配置)。下方 roles 仅作阶段 3
+#       修补节点 settings.yaml 的参考值 + 人类可读的端口台账; 真正的运行时驱动是 models.yaml。
+
+profile: dgx-spark-p0
+nvidia_fullstack: true
+# models.nvidia-fullstack.yaml = Nemotron 家族下载/启动清单 (vLLM --models 入参角色),
+# 按 PRD-S-MODEL F2 **禁止被 model_router 读取**; 运行时单源仍是 config/models.yaml。
+
+timo:
+  base_url: "http://127.0.0.1:7862"     # 节点无监听时 health 失败 -> 自动走离线 byte-identical 桥接
+  timeout_s: 25
+  health_timeout_s: 4
+  # 引擎落点 = 节点 home 派生 (T4 部署目标); env CNC_BRAIN_SRC/CNC_BRAIN_PY 优先级最高
+  # (adapters/timo_adapter.py:51-58), 部署时以 env 注入为准, 下方为台账默认值。
+  engine_src: "/home/Developer/timo_engine"
+  engine_python: "/home/Developer/miniconda3/envs/occ/bin/python"
+  allow_fallback: true
+
+# ---- Model Router: 节点实跑 backend=local (无 docker -> NIM 容器线不可行) ----
+model_router:
+  backend: local
+  nvidia_preferred: true
+  roles:
+    # v2 (2026-09-22): 30B 弃用, FAST/REASON/VISION/ASR 全部统一 Omni :8002
+    # (chat completions JSON 无 tool-calls, Omni 完全覆盖 planner 路径)
+    FAST:
+      endpoint: "http://127.0.0.1:8002/v1"
+      model: "nemotron-omni-30b-a3b"
+      note: "Omni 统一推理端点 (30B 已弃用: unified-memory 争抢 crash-loop)"
+    REASON:
+      endpoint: "http://127.0.0.1:8002/v1"
+      model: "nemotron-omni-30b-a3b"
+      note: "RFQ 抽取/ReAct 规划/回复草稿 (LLM 提议, 引擎裁决); 与 FAST 同读 Omni"
+    VISION:
+      endpoint: "http://127.0.0.1:8002/v1"
+      model: "nemotron-omni-30b-a3b"
+      note: "Omni 多模态: 图纸视觉 VLM + 图纸文字 OCR"
+    EMBED:
+      endpoint: "http://127.0.0.1:8011/v1"
+      model: "nemotron-embed-1b"
+      note: "Embed-1B 非对称双塔; 不可达则 HashEmbedder 显式 MOCK 降级, 不冒充在线"
+    ASR:
+      endpoint: "http://127.0.0.1:8002/v1"
+      model: "nemotron-omni-30b-a3b"
+      note: "Omni any-to-any 音频路径; 专档流式 ASR 未部署"
+    DETERMINISTIC:
+      backend: timo-kernel
+      endpoint: "http://127.0.0.1:7862"
+      model: "calc_quote+ConflictChecker"
+      locked: true
+      note: "铁律①: 报价/冲突/毛利/状态机永走 Timo 引擎, 不平替为 LLM"
+
+# ---- B 分层 RAG 网关 (services/rag_layers.py) ----
+# Embed-1B 实测口径 (E2/E3 冒烟): 非对称双塔须带前缀, 否则排序错误 (0.3758 vs 0.5209);
+# 首调用 ~10.45s 超 3s 默认 -> timeout 放宽 15s; 稳态 ~10ms。
+rag_layers:
+  enabled: true
+  embed_url: "http://127.0.0.1:8011/v1"
+  embed_model: "nemotron-embed-1b"
+  embed_query_prefix: "query: "
+  embed_passage_prefix: "passage: "
+  vector_backend: file          # memory | qdrant | file (JSON 落盘, 重启持久)
+  timeout_s: 15
+  degrade_cooldown_s: 60        # 在线失败后冷却 N 秒不再探测, 直接哈希降级
+
+guardrails:
+  backend: nemo_soft            # 节点未装 nemoguardrails -> guardrails.py 检测包后自动降级 builtin
+  input_block: [prompt_injection, data_exfiltration, dangerous_content, credential_leak]
+  tool_allowlist_enforced: true
+  output_external_send: draft_only
+
+# ---- 多模态 Intake (节点无独立 funasr 网关; Omni/Embed 覆盖 VLM/embed, 余者显式 mock) ----
+# Omni 实测口径 (2026-09-22 音频 probe): 根 /health 200 (/v1/health 404);
+# POST /v1/chat/completions + input_audio content part -> 200 finish=stop,
+# 带音频 52 vs 不带 30 prompt_tokens, 音频确被感知。适配器剥尾部 /v1 后自拼路径,
+# 故 vlm_url/asr_url 均**不带** /v1 (带也不会双拼, _strip_v1 归一化)。
+# ASR 2026-09-25 起走 cli 子进程 (与节点 settings.yaml 实测口径一致): omni 的
+# input_audio 只吐英文音频场景描述 ("In the Tan Sui Xia, ..."), 不是中文转写;
+# occ 环境无 ASR 引擎 → scripts/asr_cli.py 由独立解释器 (faster-whisper) 跑子进程。
+funasr:
+  base_url: "http://127.0.0.1:8002/v1"  # 无专用网关; health 剥 /v1 后探根 OK, /transcribe /rag 缺 -> mock
+  asr_url: "http://127.0.0.1:8002"      # Omni 音频路径 (仅 asr_mode=omni 时用)
+  vlm_url: "http://127.0.0.1:8002"      # Omni 视觉 (适配器拼 /v1/chat/completions, 此处不带 /v1)
+  embed_url: "http://127.0.0.1:8011/v1" # Embed-1B
+  asr_mode: cli                         # funasr | omni | cli (节点实测: cli = scripts/asr_cli.py 子进程)
+  asr_model: "nemotron-omni-30b-a3b"    # Omni any-to-any 音频路径 (仅 omni 模式用)
+  asr_cli: "scripts/asr_cli.py"         # cli 模式脚本 (相对仓库根, 随仓交付)
+  asr_cli_timeout_s: 900                # 实测 38.6s 音频含 cold start 139s (原 180s 会误杀)
+  asr_cli_fallback: false               # 不回落 omni: 英文 caption 污染 RAG, 宁可显式 MOCK
+  vlm_model: "nemotron-omni-30b-a3b"    # Omni 视觉 (图纸 VLM + OCR)
+  max_tokens: 4096                      # 推理模型预算: 2000 实测偶发 finish=length, 4096 两次 finish=stop
+  timeout_s: 180                        # Omni 首调用 ~10s 级 (probe 实测口径, 原 30s 会误杀)
+  allow_mock: true              # 不可达入口显式 MOCK 标注, 绝不冒充生产结果
+
+# ---- 服务端口 (公网映射 8888->8051; 节点 IP 见本地 node.env, 不写死/不入包) ----
+# 注: api_server.py:930-932 host 写死 127.0.0.1 + 默认端口 8900, **不读本段**;
+#     实际 bind 由 T5 启动命令 --host 0.0.0.0 --port 8888 落地 (公网可达需非 loopback)。
+server:
+  host: "0.0.0.0"
+  workbench_port: 8888          # 对应公网 :8051
+  aux_port: 8900                # 节点 :9000 被队友 jupyter 占用 -> aux 用 PRD 确认空闲的 :8900
+
+storage:
+  contexts_dir: "data/contexts"
+  audit_db: "data/audit.sqlite3"
+  crm_db: "data/crm.sqlite3"
+  artifacts_dir: "data/artifacts"
+  traces_dir: "data/traces"
+
+# ---- 铁律① data-stays-local: 集中式发信主闸默认 DENY (services/egress_gate.py) ----
+egress:
+  allow: false
+  channels:
+    smtp: false
+    webhook: false
+    imap: false

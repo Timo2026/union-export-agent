@@ -1,0 +1,146 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# venv (制造内核重依赖由引擎 .venv 提供, 不入库)
+.venv/
+venv/
+# 注意: 本仓 env/ 是交付的 conda 环境定义 (env/occ.yml, env/nemotron.yml,
+# 见 docs/REPRODUCTION.md), 不属虚拟环境, 故不忽略。
+
+# 测试/缓存
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 运行产物 (context/trace/demo/artifact/数据库/日志)
+data/contexts/
+data/traces/
+data/demo/
+data/artifacts/
+data/supplier_pipelines/
+data/thumbnails/
+data/feedback.sqlite3
+data/*.sqlite3
+data/**/*.sqlite3
+data/crm_sandboxes/
+data/rag_vectors.json
+data/jievo_po_report.json
+data/batch_quote_report.json
+data/quote_accuracy_report.json
+data/_d4_extract/
+data/flywheel_demo/
+data/*.log
+data/_pytest_full.txt
+*.log
+*.sqlite3
+
+# v3.0.1 Gmail + 凭据 (铁律①: 凭据永远在本机, 不入库)
+data/credentials.json
+data/gmail_settings.json
+data/skill_audit.jsonl
+data/egress_gate.jsonl
+data/notifications/
+data/backups/
+
+# v3.0 草稿 (含客户报价 SHA16 锁 + 可能含 PII)
+data/drafts/
+
+# 导出内容自检 token (本地 only, 永不入公开 repo)
+data/_export_secrets.txt
+
+# 并发会话隔离物 (非本包内容)
+_foreign_concurrent/
+
+# 编辑器/系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 工具产物 (CodeArts 会话配置, 不入库)
+.arts/
+
+# NovaStudio 4 工具链 (~6.3GB, 外部化: 见 docs 部署指引, 严禁入库)
+tools/
+
+# AI 会话/临时产物 (不入库)
+.tmp/
+.dumate/
+.image_gen/
+.codeartsdoer/
+
+# 保留 data 下的样本与验收集 (显式不忽略)
+!data/samples/
+!data/golden_scenarios.json
+node_modules
+
+# ── v7.1.0 commit 卫生 (铁律① data-stays-local; 2026-09-24) ──────────────
+# 活数据: 真实邮件/订单/媒体/运行产物 — 含真实 QQ 账号与客户内容, 永不入库
+data/mailbox/
+data/media/
+data/mail_puller/
+data/meshes/
+data/thumbnails_backup_0922/
+data/audit/
+data/orders.json
+data/notifications.jsonl
+data/media_docs.json
+
+# 本机基建工具 (operator-side): 持实时节点 IP/凭据, 按 sanitize_public 政策不进干净 repo
+deploy/
+scripts/sanitize_public.py
+scripts/ssh_inventory.py
+scripts/ssh_lib.py
+scripts/test_e2e_8051.py
+
+# 构建产物 / 临时验证物 / 截图 (可复现, 非交付本体; 截图可能含真实账号须脱敏)
+webui-dist/
+webui-dist.bak/
+webui-A/
+.domcheck/
+.design-suite/
+vibe_images/
+e2e_test.js
+e2e_report.json
+preview_server.js
+notes.md
+webui-B-dom.html
+webui-emails.png
+webui-B-v2.png
+webui-B-screenshot.png
+
+# 敏感: 节点登录信息表 / Timo 凭据包 (铁律① 凭据不出本机)
+Timo.zip
+*.localsheet.xlsx
+登录信息表.xlsx
+
+# ── v7.1.0 GitHub 标准化 (2026-09-27 节点实测) ──────────────────────────────
+# 节点运行产生的 services 多次备份 (含历史回滚, 非交付本体, 体积大)
+services.bak.*/
+services/*.bak.*/
+
+# 节点临时暂存 / AI 会话产物
+.a5stage/
+.a5/
+
+# data 下清理脚本产生的批量备份 (可复现清理, 非数据本体)
+data/_cleanup_backup_*/
+
+# openclaw-skills 字节码缓存
+openclaw-skills/**/__pycache__/
+
+# 本地审查/探针产物 (从节点拉取的对照副本 + 一次性 SSH 探针脚本, 不入公开 repo)
+_remote_audit/
+scripts/_probe_*.py
+scripts/_pull_*.py
+
+# 节点实时运行日志 (可能含真实上下文)
+livekernel*.log
+
